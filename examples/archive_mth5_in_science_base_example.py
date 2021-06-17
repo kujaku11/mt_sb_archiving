@@ -12,7 +12,7 @@ import os
 import shutil
 import datetime
 
-import mth5.mth5 as mth5
+from mth5.mth5 import MTH5
 import usgs_archive.usgs_archive as archive
 
 # import usgs_archive.usgs_sb_xml as sb_xml
