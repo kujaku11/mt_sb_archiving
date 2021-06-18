@@ -12,6 +12,9 @@ from pathlib import Path
 import time
 import sciencebasepy as sb
 
+import urllib as url
+import xml.etree.ElementTree as ET
+
 # =============================================================================
 # Science Base Functions
 # =============================================================================
@@ -225,3 +228,56 @@ def sb_upload_data(
     session.logout()
 
     return item
+
+# =============================================================================
+# Get national map elevation data from internet
+# =============================================================================
+def get_nm_elev(lat, lon):
+    """
+    Get national map elevation for a given lat and lon.
+
+    Queries the national map website for the elevation value.
+
+    :param lat: latitude in decimal degrees
+    :type lat: float
+
+    :param lon: longitude in decimal degrees
+    :type lon: float
+
+    :return: elevation (meters)
+    :rtype: float
+
+    :Example: ::
+
+        >>> import mtpy.usgs.usgs_archive as archive
+        >>> archive.get_nm_elev(35.467, -115.3355)
+        >>> 809.12
+
+    .. note:: Needs an internet connection to work.
+
+    """
+    nm_url = r"https://nationalmap.gov/epqs/pqs.php?x={0:.5f}&y={1:.5f}&units=Meters&output=xml"
+    print(lat, lon)
+    # call the url and get the response
+    try:
+        response = url.request.urlopen(nm_url.format(lon, lat))
+    except (url.error.HTTPError, url.request.http.client.RemoteDisconnected):
+        print("xxx GET_ELEVATION_ERROR: Could not connect to internet")
+        return -666
+
+    # read the xml response and convert to a float
+    try:
+        info = ET.ElementTree(ET.fromstring(response.read()))
+        info = info.getroot()
+        nm_elev = 0.0
+        for elev in info.iter("Elevation"):
+            nm_elev = float(elev.text)
+        return nm_elev
+    except ET.ParseError as error:
+        print(
+            "xxx Something wrong with xml elevation for lat = {0:.5f}, lon = {1:.5f}".format(
+                lat, lon
+            )
+        )
+        print(error)
+        return -666

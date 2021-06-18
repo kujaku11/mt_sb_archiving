@@ -10,7 +10,7 @@ Created on Thu Jun 10 12:33:12 2021
 """
 from pathlib import Path
 from configparser import ConfigParser
-from usgs_archive import xml_utils
+from archive.utils import xml_utils
 import datetime
 
 
