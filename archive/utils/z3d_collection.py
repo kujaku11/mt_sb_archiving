@@ -12,8 +12,9 @@ Created on Tue Aug 29 16:38:28 2017
 
 @author: jpeacock
 """
-# ==============================================================================
-
+# =============================================================================
+# Imports
+# =============================================================================
 from pathlib import Path
 import datetime
 
@@ -26,6 +27,8 @@ import scipy.signal as sps
 import pandas as pd
 
 from mth5.io import zen
+from mth5.io.reader import read_file
+from mth5.timeseries import RunTS
 
 # =============================================================================
 class Z3DCollectionError(Exception):
@@ -38,7 +41,7 @@ class Z3DCollectionError(Exception):
 class Z3DCollection(object):
     """
     Collects .z3d files into useful arrays and lists
-
+    
     ================= ============================= ===========================
     Attribute         Description                   Default
     ================= ============================= ===========================
@@ -48,7 +51,7 @@ class Z3DCollection(object):
     leap_seconds      number of leap seconds for    16 [2016]
                       a given year
     ================= ============================= ===========================
-
+    
     ===================== =====================================================
     Methods               Description
     ===================== =====================================================
@@ -60,18 +63,18 @@ class Z3DCollection(object):
     get_chn_order         Get the appropriate channels, in case some are
                           missing
     ===================== =====================================================
-
+    
     :Example: ::
-
+    
         >>> import mtpy.usgs.usgs_archive as archive
         >>> z3d_path = r"/Data/Station_00"
         >>> zc = archive.Z3DCollection()
         >>> fn_list = zc.get_time_blocks(z3d_path)
-
+    
     """
 
-    def __init__(self):
-
+    def __init__(self, z3d_path=None):
+        self.z3d_path = z3d_path
         self.chn_order = ["hx", "ex", "hy", "ey", "hz"]
         self.meta_notes = None
         self.verbose = True
@@ -96,6 +99,66 @@ class Z3DCollection(object):
                 ("station", "U12"),
             ]
         )
+        
+        self._keys_dict = {
+            "station": "station",
+            "start": "start",
+            "stop": "stop",
+            "sample_rate": "sample_rate",
+            "component": "component",
+            "fn_z3d": "fn",
+            "azimuth": "azimuth",
+            "dipole_length": "dipole_len",
+            "coil_number": "coil_num",
+            "latitude": "latitude",
+            "longitude": "longitude",
+            "elevation": "elevation",
+            "n_samples": "n_samples",
+            "block": "block",
+            "run": "run",
+            "zen_num": "zen_num",
+            "cal_fn": "cal_fn",
+        }
+        
+        self._dtypes = {
+            "station": str,
+            "start": str,
+            "stop": str,
+            "sample_rate": float,
+            "component": str,
+            "fn_z3d": str,
+            "azimuth": float,
+            "dipole_length": float,
+            "coil_number": str,
+            "latitude": float,
+            "longitude": float,
+            "elevation": float,
+            "n_samples": int,
+            "block": int,
+            "run": int,
+            "zen_num": str,
+            "cal_fn": str,
+        }
+        
+    @property
+    def z3d_path(self):
+        """
+        Path object to z3d directory
+        """
+        return self._z3d_path
+
+    @z3d_path.setter
+    def z3d_path(self, z3d_path):
+        """
+        :param z3d_path: path to z3d files
+        :type z3d_path: string or Path object
+
+        sets z3d_path as a Path object
+        """
+        if z3d_path is None:
+            self._z3d_path = None
+        else:
+            self._z3d_path = Path(z3d_path)
 
     def _empty_meta_arr(self):
         """
@@ -138,51 +201,149 @@ class Z3DCollection(object):
 
         ### return a pandas series, easier to access than dataframe
         return df.iloc[0]
-
-    def get_time_blocks(self, z3d_dir):
+    
+    def get_z3d_fn_list(self, z3d_path=None):
         """
-        Organize z3d files into blocks based on start time and sampling rate
-        in the file name.
+        Get a list of z3d files in a given directory
 
-        .. note:: This assumes the z3d file is named
-                  * station_date_time_samplingrate_chn.z3d
-
-        :param z3d_dir: full path to z3d files
-        :type z3d_dir: string
-
-        :returns: nested list of files for each time block, sorted by time
+        :param z3d_path: Path to z3d files
+        :type z3d_path: [ str | pathlib.Path object]
+        :return: list of z3d files
+        :rtype: list
 
         :Example: ::
 
-            >>> import mtpy.usgs.usgs_archive as archive
-            >>> zc = archive.Z3DCollection()
-            >>> fn_list = zc.get_time_blocks(r"/home/mt_data/station_01")
-
+            >>> zc = Z3DCollection()
+            >>> z3d_fn_list = zc.get_z3d_fn_list(z3d_path=r"/home/z3d_files")
         """
-        z3d_dir = Path(z3d_dir)
-        fn_list = z3d_dir.glob("*.z3d")
-        merge_list = []
-
-        for fn in fn_list:
-            z3d_obj = zen.Zen3D(fn=fn)
-            z3d_obj.read_all_info()
-            merge_list.append(
-                {"fn": fn, "start_date": z3d_obj.zen_schedule, "df": z3d_obj.df}
+        if z3d_path is not None:
+            self.z3d_path = z3d_path
+        if not self.z3d_path.exists():
+            raise ValueError(
+                "Error: Directory {0} does not exist".format(self.z3d_path)
             )
 
-        if merge_list == []:
-            raise Z3DCollectionError((f"No .z3d files in {z3d_dir}"))
+        z3d_list = [
+            fn_path
+            for fn_path in self.z3d_path.rglob("*")
+            if fn_path.suffix in [".z3d", ".Z3D"]
+        ]
+        return z3d_list
+    
+    def get_calibrations(self, calibration_path):
+        """
+        get coil calibrations
+        """
+        if calibration_path is None:
+            print("ERROR: Calibration path is None")
+            return {}
 
-        df = pd.DataFrame(merge_list)
+        if not isinstance(calibration_path, Path):
+            calibration_path = Path(calibration_path)
 
-        start_list = list(set(df["start_date"]))
+        if not calibration_path.exists():
+            print(
+                "WARNING: could not find calibration path: "
+                "{0}".format(calibration_path)
+            )
+            return {}
 
-        merge_fn_list = []
-        for start in start_list:
-            merge_fn_list.append(df[df.start_date == start]["fn"].tolist())
+        calibration_dict = {}
+        for cal_fn in calibration_path.glob("*.csv"):
+            cal_num = cal_fn.stem
+            calibration_dict[cal_num] = cal_fn
 
-        return merge_fn_list
+        return calibration_dict
+    
+    def get_z3d_df(self, z3d_path=None, calibration_path=None):
+        """
+        Get general z3d information and put information in a dataframe
 
+        :param z3d_fn_list: List of files Paths to z3d files
+        :type z3d_fn_list: list
+
+        :return: Dataframe of z3d information
+        :rtype: Pandas.DataFrame
+
+        :Example: ::
+
+            >>> zc_obj = zc.Z3DCollection(r"/home/z3d_files")
+            >>> z3d_fn_list = zc.get_z3d_fn_list()
+            >>> z3d_df = zc.get_z3d_info(z3d_fn_list)
+            >>> # write dataframe to a file to use later
+            >>> z3d_df.to_csv(r"/home/z3d_files/z3d_info.csv")
+
+        """
+        z3d_fn_list = self.get_z3d_fn_list(z3d_path)
+        
+        if len(z3d_fn_list) < 1:
+            raise ValueError("No Z3D files found")
+
+        cal_dict = self.get_calibrations(calibration_path)
+        z3d_info_list = []
+        for z3d_fn in z3d_fn_list:
+            z3d_obj = zen.Z3D(z3d_fn)
+            z3d_obj.read_all_info()
+            #z3d_obj.start = z3d_obj.zen_schedule.isoformat()
+            # set some attributes to null to fill later
+            z3d_obj.stop = None
+            z3d_obj.n_samples = 0
+            z3d_obj.block = 0
+            z3d_obj.run = -666
+            z3d_obj.zen_num = "ZEN{0:03.0f}".format(z3d_obj.header.box_number)
+            try:
+                z3d_obj.cal_fn = cal_dict[z3d_obj.coil_num]
+            except KeyError:
+                z3d_obj.cal_fn = 0
+            # make a dictionary of values to put into data frame
+            entry = dict(
+                [
+                    (key, getattr(z3d_obj, value))
+                    for key, value in self._keys_dict.items()
+                ]
+            )
+            entry["start"] = z3d_obj.zen_schedule.isoformat()
+            z3d_info_list.append(entry)
+
+        # make pandas dataframe and set data types
+        z3d_df = pd.DataFrame(z3d_info_list)
+        z3d_df = z3d_df.astype(self._dtypes)
+        z3d_df.start = pd.to_datetime(z3d_df.start, errors="coerce")
+        z3d_df.stop = pd.to_datetime(z3d_df.stop, errors="coerce")
+
+        # assign block numbers
+        for sr in z3d_df.sample_rate.unique():
+            starts = sorted(z3d_df[z3d_df.sample_rate == sr].start.unique())
+            for block_num, start in enumerate(starts):
+                z3d_df.loc[(z3d_df.start == start), "block"] = block_num
+                
+        # assign run number
+        for ii, start in enumerate(sorted(z3d_df.start.unique())):
+            z3d_df.loc[(z3d_df.start == start), "run"] = ii
+
+        return z3d_df
+
+    def make_runts(self, run_df):
+        """
+        Create a RunTS object given a Dataframe of channels
+        
+        :param run_df: DESCRIPTION
+        :type run_df: TYPE
+        :return: DESCRIPTION
+        :rtype: TYPE
+
+        """
+        ch_list = []
+        for entry in run_df.itertuples():
+            ch_obj = read_file(entry.fn_z3d)
+            ch_obj.run_metadata.id = f"{run_df.run.unique()[0]:03d}"
+            ch_list.append(ch_obj)
+        run_obj = RunTS(array_list=ch_list)
+        # run_obj.run_metadata.id = 
+        # run_obj.station_metadata.runs.append(run_obj.run_metadata)
+        return run_obj
+        
+  
     # ==================================================
     def merge_z3d_block(self, fn_list, decimate=1):
         """
@@ -220,7 +381,7 @@ class Z3DCollection(object):
 
         print("-" * 50)
         for ii, fn in enumerate(fn_list):
-            z3d_obj = zen.Zen3D(fn)
+            z3d_obj = zen.Z3D(fn)
             try:
                 z3d_obj.read_z3d()
             except zen.ZenGPSError:
@@ -232,14 +393,14 @@ class Z3DCollection(object):
             dt_index = z3d_obj.ts_obj.ts.data.index.astype(np.int64) / 10.0 ** 9
 
             # extract useful data that will be for the full station
-            sampling_rate[ii] = z3d_obj.df
+            sampling_rate[ii] = z3d_obj.sample_rate
             lat[ii] = z3d_obj.latidted
             lon[ii] = z3d_obj.longitude
             elev[ii] = z3d_obj.elevation
             station[ii] = z3d_obj.station
             zen_num[ii] = int(z3d_obj.header.box_number)
 
-            #### get channel setups
+            # get channel setups
             meta_df["comp"] += f"{comp} "
             meta_df[f"{comp}_start"] = dt_index[0]
             meta_df[f"{comp}_stop"] = dt_index[-1]
@@ -256,7 +417,7 @@ class Z3DCollection(object):
             meta_df[f"{comp}_n_samples"] = z3d_obj.ts_obj.ts.shape[0]
             n_samples.append(z3d_obj.ts_obj.ts.shape[0])
             meta_df[f"{comp}_t_diff".format(comp, "t_diff")] = (
-                int((dt_index[-1] - dt_index[0]) * z3d_obj.df)
+                int((dt_index[-1] - dt_index[0]) * z3d_obj.sample_rate)
                 - z3d_obj.ts_obj.ts.shape[0]
             )
             # give deviation in percent
