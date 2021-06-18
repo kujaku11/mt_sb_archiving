@@ -31,11 +31,11 @@ archive_logger = logging.getLogger("sb_archiving")
 archive_logger.setLevel(logging.DEBUG)
 archive_logger.propagate = False
 
-stream_handler = logging.StreamHandler()
-stream_handler.setFormatter(LOG_FORMAT)
-stream_handler.setLevel(logging.INFO)
+# stream_handler = logging.StreamHandler()
+# stream_handler.setFormatter(LOG_FORMAT)
+# stream_handler.setLevel(logging.INFO)
 
-archive_logger.addHandler(stream_handler)
+# archive_logger.addHandler(stream_handler)
 
 
 # =============================================================================
@@ -132,7 +132,7 @@ if not save_dir.exists():
 # =============================================================================
 file_handler = logging.FileHandler(filename=save_dir.joinpath("sb_archiving.log"))
 file_handler.setFormatter(LOG_FORMAT)
-file_handler.setLevel(logging.DEBUG)
+file_handler.setLevel(logging.INFO)
 file_handler.propagate = False
 
 archive_logger.addHandler(file_handler)
