@@ -21,7 +21,7 @@ import numpy as np
 import pandas as pd
 
 from mth5.io import zen
-from mth5.io.reader import read_file
+# from mth5.io.reader import read_file
 from mth5.timeseries import RunTS
 
 from mt_metadata.timeseries.filters import FrequencyResponseTableFilter
@@ -277,7 +277,7 @@ class Z3DCollection(object):
 
         return z3d_df
 
-    def make_runts(self, run_df):
+    def make_runts(self, run_df, logger_file_handler=None):
         """
         Create a RunTS object given a Dataframe of channels
         
@@ -290,7 +290,7 @@ class Z3DCollection(object):
         ch_list = []
         fap_list = []
         for entry in run_df.itertuples():
-            ch_obj = read_file(entry.fn_z3d)
+            ch_obj = zen.read_z3d(entry.fn_z3d, logger_file_handler=logger_file_handler)
             if entry.cal_fn not in [0, "0"]:
                 fap_list.append(self._make_fap_filter(entry.cal_fn))
                 

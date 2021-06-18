@@ -16,9 +16,8 @@ from pathlib import Path
 from mth5.mth5 import MTH5
 from archive import archive
 from archive.utils import z3d_collection
-
-# import usgs_archive.usgs_sb_xml as sb_xml
 from archive import mt_xml
+
 import getpass
 
 # =============================================================================
@@ -134,6 +133,7 @@ if not save_dir.exists():
 file_handler = logging.FileHandler(filename=save_dir.joinpath("sb_archiving.log"))
 file_handler.setFormatter(LOG_FORMAT)
 file_handler.setLevel(logging.DEBUG)
+file_handler.propagate = False
 
 archive_logger.addHandler(file_handler)
 # =============================================================================
@@ -172,22 +172,23 @@ for station in station_list:
         archive_logger.info("starting at %s", station_st)
         
         ### copy edi and png into archive director
-        edi_fn = save_station_dir.joinpath(f"{station}.edi")
-        png_fn = save_station_dir.joinpath(f"{station}.png")
+        edi_fn = save_station_dir.joinpath(f"{station.stem}.edi")
+        png_fn = save_station_dir.joinpath(f"{station.stem}.png")
         if not edi_fn.is_file():
             try:
-                shutil.copy(edi_path.joinpath(f"{station}.edi"), edi_fn)
+                shutil.copy(edi_path.joinpath(f"{station.stem}.edi"), edi_fn)
             except Exception as error:
                 archive_logger.error(error)
         if not png_fn.is_file():
             try:
-                shutil.copy(edi_path.joinpath(f"{station}.png"), png_fn)
+                shutil.copy(edi_path.joinpath(f"{station.stem}.png"), png_fn)
             except Exception as error:
                 archive_logger.error(error)                
 
         ### Make MTH5 File
-        m = MTH5(shuffle=False, fletcher32=False, compression="gzip")
-        mth5_fn = save_station_dir.joinpath(f"{station}.h5")
+        m = MTH5(shuffle=False, fletcher32=False, compression="gzip",
+                 compression_opts=9)
+        mth5_fn = save_station_dir.joinpath(f"{station.stem}.h5")
         m.open_mth5(mth5_fn, "w")
         if not m.h5_is_write:
             msg = f"Something went wrong with opening {mth5_fn}, check logs"
@@ -197,9 +198,10 @@ for station in station_list:
         # update survey metadata
         
         ### loop over schedule blocks
-        for run_num in fn_df.run.unique():
+        # for run_num in fn_df.run.unique():
+        for run_num in [1]:
             run_df = fn_df.loc[fn_df.run == run_num]
-            runts_obj, fap_list = zc.make_runts(run_df)
+            runts_obj, fap_list = zc.make_runts(run_df, file_handler)
             
             # add station
             station_group = m.add_station(
@@ -210,13 +212,16 @@ for station in station_list:
             # add run
             run_group = station_group.add_run(runts_obj.run_metadata.id,
                                               runts_obj.run_metadata)
-            run_group.from_runts(runts_obj, chunks=False)
+            channels = run_group.from_runts(runts_obj, chunks=True)
+            run_group.validate_run_metadata()
     
             # need to update metadata
             station_group.validate_station_metadata()
             
             for fap in fap_list:
                 m.filters_group.add_filter(fap)
+                
+        m.survey_group.update_survey_metadata()
 
         m.close_mth5()
     #     ####------------------------------------------------------------------
