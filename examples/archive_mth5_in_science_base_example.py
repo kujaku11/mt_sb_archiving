@@ -31,11 +31,11 @@ archive_logger = logging.getLogger("sb_archiving")
 archive_logger.setLevel(logging.DEBUG)
 archive_logger.propagate = False
 
-# stream_handler = logging.StreamHandler()
-# stream_handler.setFormatter(LOG_FORMAT)
-# stream_handler.setLevel(logging.INFO)
+stream_handler = logging.StreamHandler()
+stream_handler.setFormatter(LOG_FORMAT)
+stream_handler.setLevel(logging.INFO)
 
-# archive_logger.addHandler(stream_handler)
+archive_logger.addHandler(stream_handler)
 
 
 # =============================================================================
