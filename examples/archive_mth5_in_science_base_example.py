@@ -19,6 +19,8 @@ from archive import archive
 from archive.utils import z3d_collection
 from archive import mt_xml
 
+from mt_metadata.timeseries import Survey
+
 import getpass
 
 # =============================================================================
@@ -30,12 +32,12 @@ LOG_FORMAT = logging.Formatter(
 
 archive_logger = logging.getLogger("sb_archiving")
 archive_logger.setLevel(logging.DEBUG)
-archive_logger.propagate = False
+archive_logger.propagate = True
 
 stream_handler = logging.StreamHandler()
 stream_handler.setFormatter(LOG_FORMAT)
 stream_handler.setLevel(logging.INFO)
-stream_handler.propagate = False
+stream_handler.propagate = True
 
 archive_logger.addHandler(stream_handler)
 
@@ -137,7 +139,7 @@ if not save_dir.exists():
 file_handler = logging.FileHandler(filename=save_dir.joinpath("sb_archiving.log"))
 file_handler.setFormatter(LOG_FORMAT)
 file_handler.setLevel(logging.INFO)
-file_handler.propagate = False
+file_handler.propagate = True
 
 archive_logger.addHandler(file_handler)
 # =============================================================================
@@ -200,6 +202,12 @@ for station in station_list:
             raise ValueError(msg)
             
         # update survey metadata
+        try:
+            survey = Survey(**cfg_dict["survey"])
+            m.survey_group.metadata.update(survey)
+        except KeyError:
+            pass
+            
         
         ### loop over schedule blocks
         # for run_num in fn_df.run.unique():

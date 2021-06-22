@@ -104,7 +104,7 @@ class Z3DCollection(object):
             "component": "component",
             "fn_z3d": "fn",
             "azimuth": "azimuth",
-            "dipole_length": "dipole_len",
+            "dipole_length": "dipole_length",
             "coil_number": "coil_num",
             "latitude": "latitude",
             "longitude": "longitude",
@@ -244,7 +244,7 @@ class Z3DCollection(object):
             z3d_obj.n_samples = 0
             z3d_obj.block = 0
             z3d_obj.run = -666
-            z3d_obj.zen_num = "ZEN{0:03.0f}".format(z3d_obj.header.box_number)
+            z3d_obj.zen_num = z3d_obj.header.data_logger
             try:
                 z3d_obj.cal_fn = cal_dict[z3d_obj.coil_num]
             except KeyError:
@@ -301,7 +301,12 @@ class Z3DCollection(object):
                 pass
             
             if entry.cal_fn not in [0, "0"]:
-                fap_list.append(self._make_fap_filter(entry.cal_fn))
+                if not ch_obj.channel_response_filter:
+                    fap_obj = self._make_fap_filter(entry.cal_fn)
+                    fap_list.append(fap_obj)
+                    ch_obj.channel_metadata.filter.name.append(fap_obj.name)
+                    ch_obj.channel_metadata.filter.applied.append(False)
+                
                 
             ch_obj.run_metadata.id = f"{run_df.run.unique()[0]:03d}"
             ch_list.append(ch_obj)
@@ -311,6 +316,14 @@ class Z3DCollection(object):
             for k, v in run_dict.items():
                 if v not in [None, "None", "none", "1980-01-01T00:00:00+00:00"]:
                     run_obj.run_metadata.set_attr_from_name(k, v) 
+        except KeyError:
+            pass
+        
+        try:
+            station_dict = config_dict["station"]
+            for k, v in station_dict.items():
+                if v not in [None, "None", "none", "1980-01-01T00:00:00+00:00"]:
+                    run_obj.station_metadata.set_attr_from_name(k, v) 
         except KeyError:
             pass
 
@@ -327,7 +340,7 @@ class Z3DCollection(object):
         
         fap_df = pd.read_csv(cal_fn)
         fap = FrequencyResponseTableFilter()
-        fap.units_in = "digital counts"
+        fap.units_in = "millivolts"
         fap.units_out = "nanotesla"
         fap.name = f"ant4_{cal_fn.stem}_response"
         fap.amplitudes = np.sqrt(fap_df.real**2 + fap_df.imaginary**2).to_numpy()
