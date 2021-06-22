@@ -12,6 +12,7 @@ import shutil
 import datetime
 import logging
 from pathlib import Path
+from configparser import ConfigParser
 
 from mth5.mth5 import MTH5
 from archive import archive
@@ -34,6 +35,7 @@ archive_logger.propagate = False
 stream_handler = logging.StreamHandler()
 stream_handler.setFormatter(LOG_FORMAT)
 stream_handler.setLevel(logging.INFO)
+stream_handler.propagate = False
 
 archive_logger.addHandler(stream_handler)
 
@@ -54,7 +56,9 @@ csv_fn = None  # r"/mnt/hgfs/MTData/Geysers/Archive/survey_summary.csv"
 ### path to mth5 configuration file
 ### this is a configuration file that has metadata explaining most of the
 ### common information needed by the user.  See example files
-cfg_fn = Path(r"/mnt/hgfs/MT_Data/GV2020/gv_mth5.cfg")
+cfg_fn = Path(r"C:\Users\jpeacock\Documents\GitHub\mt_sb_archiving\examples\example_mth5_config_new.cfg")
+cfg_dict = ConfigParser()
+cfg_dict.read_file(cfg_fn.open())
 
 ### path to xml configuration file
 ### this is a file that has metadata common to the xml files that go into
@@ -201,7 +205,9 @@ for station in station_list:
         # for run_num in fn_df.run.unique():
         for run_num in [1]:
             run_df = fn_df.loc[fn_df.run == run_num]
-            runts_obj, fap_list = zc.make_runts(run_df, file_handler)
+            runts_obj, fap_list = zc.make_runts(run_df, 
+                                                file_handler,
+                                                cfg_dict)
             
             # add station
             station_group = m.add_station(

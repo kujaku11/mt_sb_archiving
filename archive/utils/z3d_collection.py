@@ -277,7 +277,7 @@ class Z3DCollection(object):
 
         return z3d_df
 
-    def make_runts(self, run_df, logger_file_handler=None):
+    def make_runts(self, run_df, logger_file_handler=None, config_dict={}):
         """
         Create a RunTS object given a Dataframe of channels
         
@@ -290,13 +290,29 @@ class Z3DCollection(object):
         ch_list = []
         fap_list = []
         for entry in run_df.itertuples():
-            ch_obj = zen.read_z3d(entry.fn_z3d, logger_file_handler=logger_file_handler)
+            ch_obj = zen.read_z3d(entry.fn_z3d, 
+                                  logger_file_handler=logger_file_handler)
+            try:
+                ch_dict = config_dict[ch_obj.component]
+                for k, v in ch_dict.items():
+                    if v not in [None, "None", "none", "1980-01-01T00:00:00+00:00"]:
+                        ch_obj.channel_metadata.set_attr_from_name(k, v)
+            except KeyError:
+                pass
+            
             if entry.cal_fn not in [0, "0"]:
                 fap_list.append(self._make_fap_filter(entry.cal_fn))
                 
             ch_obj.run_metadata.id = f"{run_df.run.unique()[0]:03d}"
             ch_list.append(ch_obj)
         run_obj = RunTS(array_list=ch_list)
+        try:
+            run_dict = config_dict["run"]
+            for k, v in run_dict.items():
+                if v not in [None, "None", "none", "1980-01-01T00:00:00+00:00"]:
+                    run_obj.run_metadata.set_attr_from_name(k, v) 
+        except KeyError:
+            pass
 
         return run_obj, fap_list
     
