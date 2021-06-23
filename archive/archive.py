@@ -620,6 +620,7 @@ class SBMTArcive:
                 print("Skipping %s, %s" % (station_dir.name, error))
                 # self.logger.warning("Skipping %s, %s", station_dir.name, error)
 
+            print("\a")
         if summarize:
             ### write shape file
             shp_df, shp_fn = survey_zc.write_shp_file(survey_df)
