@@ -364,7 +364,7 @@ class SBMTArcive:
         if self.xml_cfg_fn:
             s_xml.update_from_config(self.xml_cfg_fn)
 
-        s_xml.update_with_station(station)
+        s_xml.update_with_station(run_df.station.unique()[0])
 
         # location
         if survey_df:
@@ -377,9 +377,9 @@ class SBMTArcive:
         else:
             s_xml.update_bounding_box(
                 run_df.longitude.max(),
-                _df.longitude.min(),
-                survey_df.latitude.max(),
-                survey_df.latitude.min(),
+                run_df.longitude.min(),
+                run_df.latitude.max(),
+                run_df.latitude.min(),
             )
 
         # start and end time
