@@ -555,7 +555,7 @@ class MTSBXML(xml_utils.XMLRecord):
                 [
                     f"{station}.edi",
                     f"{station}.png",
-                    f"{station}.name",
+                    f"{station}.h5",
                 ]
             ),
         )

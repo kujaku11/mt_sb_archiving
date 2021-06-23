@@ -14,108 +14,36 @@ Created on Tue Aug 29 16:38:28 2017
 """
 # ==============================================================================
 
-from pathlib import Path
-import time
+import shutil
 import datetime
-import sys
-import glob
-from io import StringIO
-import collections
+import logging
+from pathlib import Path
+from configparser import ConfigParser
+import pandas as pd
+
+from mth5.mth5 import MTH5
+from archive import archive
+from archive.utils import z3d_collection
+from archive import mt_xml
+
+import getpass
 
 import urllib as url
 import xml.etree.ElementTree as ET
 
-import numpy as np
-
-import pandas as pd
-
-# for writing shape file
-import geopandas as gpd
-from shapely.geometry import Point
 
 # science base
 import sciencebasepy as sb
 
+
+LOG_FORMAT = logging.Formatter(
+    "%(asctime)s [line %(lineno)d] %(name)s.%(funcName)s - %(levelname)s: %(message)s"
+)
 # =============================================================================
 # data base error
 # =============================================================================
 class ArchiveError(Exception):
     pass
-
-
-# =============================================================================
-# class for capturing the output to store in a file
-# =============================================================================
-# this should capture all the print statements
-class Capturing(list):
-    def __enter__(self):
-        self._stdout = sys.stdout
-        sys.stdout = self._stringio = StringIO()
-        return self
-
-    def __exit__(self, *args):
-        self.extend(self._stringio.getvalue().splitlines())
-        sys.stdout = self._stdout
-
-
-# ==============================================================================
-# Need a dummy utc time zone for the date time format
-# ==============================================================================
-class UTC(datetime.tzinfo):
-    def utcoffset(self, df):
-        return datetime.timedelta(hours=0)
-
-    def dst(self, df):
-        return datetime.timedelta(0)
-
-    def tzname(self, df):
-        return "UTC"
-
-# =============================================================================
-#  define an empty metadata dataframe
-# =============================================================================
-def create_empty_meta_arr():
-    """
-    Create an empty pandas Series
-    """
-    dtypes = [
-        ("station", "U10"),
-        ("latitude", np.float),
-        ("longitude", np.float),
-        ("elevation", np.float),
-        ("start", np.int64),
-        ("stop", np.int64),
-        ("sampling_rate", np.float),
-        ("n_chan", np.int),
-        ("instrument_id", "U10"),
-        ("collected_by", "U30"),
-        ("notes", "U200"),
-    ]
-    ch_types = np.dtype(
-        [
-            ("ch_azimuth", np.float32),
-            ("ch_length", np.float32),
-            ("ch_num", np.int32),
-            ("ch_sensor", "U10"),
-            ("n_samples", np.int32),
-            ("t_diff", np.int32),
-            ("standard_deviation", np.float32),
-        ]
-    )
-
-    for cc in ["ex", "ey", "hx", "hy", "hz"]:
-        for name, n_dtype in ch_types.fields.items():
-            if "ch" in name:
-                m_name = name.replace("ch", cc)
-            else:
-                m_name = "{0}_{1}".format(cc, name)
-            dtypes.append((m_name, n_dtype[0]))
-    ### make an empy data frame, for now just 1 set.
-    df = pd.DataFrame(np.zeros(1, dtype=dtypes))
-
-    ### return a pandas series, easier to access than dataframe
-    return df.iloc[0]
-
 
 # =============================================================================
 # Get national map elevation data from internet
@@ -170,496 +98,453 @@ def get_nm_elev(lat, lon):
         print(error)
         return -666
 
-
-# =============================================================================
-# Functions to analyze csv files
-# =============================================================================
-def read_pd_series(csv_fn):
+class SBMTArcive:
     """
-    read a pandas series and turn it into a dataframe
+    Class to help archive MT data in Science Base or other data repositories
     
-    :param csv_fn: full path to schedule csv
-    :type csv_fn: string
+    * survey_name: name of the survey, string
+    * survey_dir: directory where all station folders are
+    * csv_fn: full path to a CSV file containing information about the 
+    survey.  If this is input it will overwrite metadata.
+    * cfg_fn: Full path to configuration file that contains values to 
+    fill metadata with.
+    * xml_cfg_fn: full path to configuration file that contains 
+    information for the XML files.
+    * xml_root_template: full path to a XML template for the root 
+    XML file that goes onto the parent page in Science Base.
+    * xml_child_template: full path to a XML template for the child 
+    pages in Science Base.
+    * calibration_dir: Full path to a folder containing CSV files for
+    ANT4 coils named by the coil number, ex. 4324.csv
+    * edi_path: Full path to a folder containing all EDI files for the 
+    stations.
+    * png_path: Full path to a folder containing all PNG files for the
+    stations
+    * mth5_compression: h5 compression type [ gzip | lfz | szip ]
+    * mth5_compression_level: level of compression  [ 0-9 ]
+    * mth5_chunks: create data chunks [ True | None | value]
+    True with have h5py automaically control the chunking,
+    if no compression set to None
+    * mth5_shuffle: shuffle the blocks, set to True if using compression
+    * mth5_fletcher: check for corruption, set to True if using compression
     
-    :returns: pandas dataframe 
-    :rtype: pandas.DataFrame
-    """
-    series = pd.read_csv(csv_fn, index_col=0, header=None, squeeze=True)
-
-    return pd.DataFrame(
-        dict([(key, [value]) for key, value in zip(series.index, series.values)])
-    )
-
-
-def combine_station_runs(csv_dir):
-    """
-    combine all scheduled runs into a single data frame
     
-    :param csv_dir: full path the station csv files
-    :type csv_dir: string
+    """    
+    def __init__(self, **kwargs):
+        self.survey_dir = None
+        self.archive_dir = None
+        
+        ### compression for the h5 file
+        self.mth5_compression = None
+        self.mth5_compression_level = None
+        self.mth5_chunks = None
+        self.mth5_shuffle = None
+        self.mth5_fletcher = None
+        
+        # conifiguration files
+        self.csv_fn = None  
+        self.cfg_fn = None
+        self.xml_cfg_fn = None
+        
+        # Science Base XML files
+        self.xml_root_template = None
+        self.xml_child_template = None
+        self.calibration_dir = None
+        self.edi_dir = None
+        self.png_dir = None
+        self.xml_dir = None
+        self.cfg_dict = {}
+        
+        self.logger = logging.getLogger(self.__class__.__name__)
+        self.setup_logger()
+        
+        for k, v in kwargs.items():
+            setattr(self, k, v)
+            
+        if self.cfg_fn:
+            self.cfg_dict = self.read_cfg_file(self.cfg_fn)
+            
+    def __str__(self):
+        """ overwrite the string representation """
+        lines = ["Variables Include:", "-" * 25]
+        for k in sorted(self.__dict__.keys()):
+            lines.append(f"\t{k} = {getattr(self, k)}")
+            
+        return "\n".join(lines)
     
-    """
-    station = os.path.basename(csv_dir)
-
-    csv_fn_list = sorted(
-        [
-            os.path.join(csv_dir, fn)
-            for fn in os.listdir(csv_dir)
-            if "runs" not in fn and fn.endswith(".csv")
-        ]
-    )
-
-    count = 0
-    for ii, csv_fn in enumerate(csv_fn_list):
-        if ii == 0:
-            run_df = read_pd_series(csv_fn)
-
-        else:
-            run_df = run_df.append(read_pd_series(csv_fn), ignore_index=True)
-            count += 1
-
-    ### replace any None with 0, makes it easier
-    try:
-        run_df = run_df.replace("None", "0")
-    except UnboundLocalError:
-        return None, None
-
-    ### make lat and lon floats
-    run_df.latitude = run_df.latitude.astype(np.float)
-    run_df.longitude = run_df.longitude.astype(np.float)
-
-    ### write combined csv file
-    csv_fn = os.path.join(csv_dir, "{0}_runs.csv".format(station))
-    run_df.to_csv(csv_fn, index=False)
-    return run_df, csv_fn
-
-
-def summarize_station_runs(run_df):
-    """
-    summarize all runs into a pandas.Series to be appended to survey df
-    
-    :param run_df: combined run dataframe for a single station
-    :type run_df: pd.DataFrame
-    
-    :returns: single row data frame with summarized information
-    :rtype: pd.Series
-    """
-    station_dict = collections.OrderedDict()
-    for col in run_df.columns:
-        if "_fn" in col:
-            continue
-        if col == "start":
-            value = run_df["start"].min()
-            start_date = datetime.datetime.utcfromtimestamp(float(value))
-            station_dict["start_date"] = start_date.isoformat() + " UTC"
-        elif col == "stop":
-            value = run_df["stop"].max()
-            stop_date = datetime.datetime.utcfromtimestamp(float(value))
-            station_dict["stop_date"] = stop_date.isoformat() + " UTC"
-        else:
-            try:
-                value = run_df[col].median()
-            except (TypeError, ValueError):
-                value = list(set(run_df[col]))[0]
-        station_dict[col] = value
-
-    return pd.Series(station_dict)
-
-
-def combine_survey_csv(survey_dir, skip_stations=None):
-    """
-    Combine all stations into a single data frame
-    
-    :param survey_dir: full path to survey directory
-    :type survey_dir: string
-    
-    :param skip_stations: list of stations to skip
-    :type skip_stations: list
-    
-    :returns: data frame with all information summarized
-    :rtype: pandas.DataFrame
-    
-    :returns: full path to csv file
-    :rtype: string
-    """
-
-    if not isinstance(skip_stations, list):
-        skip_stations = [skip_stations]
-
-    count = 0
-    for station in os.listdir(survey_dir):
-        station_dir = os.path.join(survey_dir, station)
-        if not os.path.isdir(station_dir):
-            continue
-        if station in skip_stations:
-            continue
-
-        # get the database and write a csv file
-        run_df, run_fn = combine_station_runs(station_dir)
-        if run_df is None:
-            print("*** No Information for {0} ***".format(station))
-            continue
-        if count == 0:
-            survey_df = pd.DataFrame(summarize_station_runs(run_df)).T
-            count += 1
-        else:
-            survey_df = survey_df.append(pd.DataFrame(summarize_station_runs(run_df)).T)
-            count += 1
-
-    survey_df.latitude = survey_df.latitude.astype(np.float)
-    survey_df.longitude = survey_df.longitude.astype(np.float)
-
-    csv_fn = os.path.join(survey_dir, "survey_summary.csv")
-    survey_df.to_csv(csv_fn, index=False)
-
-    return survey_df, csv_fn
-
-
-def read_survey_csv(survey_csv):
-    """
-    Read in a survey .csv file that will overwrite existing metadata
-    parameters.
-
-    :param survey_csv: full path to survey_summary.csv file
-    :type survey_csv: string
-
-    :return: survey summary database
-    :rtype: pandas dataframe
-    """
-    db = pd.read_csv(survey_csv, dtype={"latitude": np.float, "longitude": np.float})
-    for key in ["hx_sensor", "hy_sensor", "hz_sensor"]:
-        db[key] = db[key].fillna(0)
-        db[key] = db[key].astype(np.int)
-
-    return db
-
-
-def get_station_info_from_csv(survey_csv, station):
-    """
-    get station information from a survey .csv file
-
-    :param survey_csv: full path to survey_summary.csv file
-    :type survey_csv: string
-
-    :param station: station name
-    :type station: string
-
-    :return: station database
-    :rtype: pandas dataframe
-
-    .. note:: station must be verbatim for whats in summary.
-    """
-
-    db = read_survey_csv(survey_csv)
-    try:
-        station_index = db.index[db.station == station].tolist()[0]
-    except IndexError:
-        raise ArchiveError("Could not find {0}, check name".format(station))
-
-    return db.iloc[station_index]
-
-
-def summarize_log_files(station_dir):
-    """
-    summarize the log files to see if there are any errors
-    """
-    lines = []
-    summary_fn = os.path.join(station_dir, "archive_log_summary.log")
-    for folder in os.listdir(station_dir):
-        try:
-            log_fn = glob.glob(os.path.join(station_dir, folder, "*.log"))[0]
-        except IndexError:
-            print("xxx Did not find log file in {0}".format(folder))
-            continue
-        lines.append("{0}{1}{0}".format("-" * 10, folder))
-        with open(log_fn, "r") as fid:
-            log_lines = fid.readlines()
-            for log_line in log_lines:
-                if "xxx" in log_line:
-                    lines.append(log_line)
-                elif "error" in log_line.lower():
-                    lines.append(log_line)
-
-        with open(summary_fn, "w") as fid:
-            fid.write("\n".join(lines))
-
-    return summary_fn
-
-
-def write_shp_file(survey_df=None, survey_csv_fn=None, save_path=None):
-    """
-        write a shape file with important information
-
-        :param survey_csv_fn: full path to survey_summary.csv
-        :type survey_csf_fn: string
-
-        :param save_path: directory to save shape file to
-        :type save_path: string
-
-        :return: full path to shape files
-        :rtype: string
+    def __repr__(self):
+        return self.__str__()
+            
+    def __setattr__(self, name, value):
         """
-    if save_path is not None:
-        save_fn = save_path
-    else:
-        save_fn = os.path.join(os.path.dirname(survey_csv_fn), "survey_sites.shp")
+        Overwrite the set attribute to make anything with a fn, dir, path
 
-    survey_db = pd.read_csv(survey_csv_fn)
-    geometry = [Point(x, y) for x, y in zip(survey_db.longitude, survey_db.latitude)]
-    crs = {"init": "epsg:4326"}
-    # survey_db = survey_db.drop(['latitude', 'longitude'], axis=1)
-    survey_db = survey_db.rename(
-        columns={
-            "collected_by": "operator",
-            "instrument_id": "instr_id",
-            "station": "siteID",
-        }
-    )
+        Parameters
+        ----------
+        name : TYPE
+            DESCRIPTION.
+        value : TYPE
+            DESCRIPTION.
 
-    # list of columns to take from the database
-    col_list = [
-        "siteID",
-        "latitude",
-        "longitude",
-        "elevation",
-        "hx_azimuth",
-        "hy_azimuth",
-        "hz_azimuth",
-        "hx_sensor",
-        "hy_sensor",
-        "hz_sensor",
-        "ex_length",
-        "ey_length",
-        "ex_azimuth",
-        "ey_azimuth",
-        "n_chan",
-        "instr_id",
-        "operator",
-        "type",
-        "quality",
-        "start_date",
-        "stop_date",
-    ]
+        Returns
+        -------
+        None.
 
-    survey_db = survey_db[col_list]
+        """
+        
+        if "_dir" in name or "_fn" in name or "_template" in name:
+            if value is not None:
+                value = Path(value)
+        super().__setattr__(name, value)
+        
+    def setup_logger(self):
+        self.logger.setLevel(logging.DEBUG)
+        self.logger.propagate = False
+        
+        stream_handler = logging.StreamHandler()
+        stream_handler.setFormatter(LOG_FORMAT)
+        stream_handler.setLevel(logging.WARNING)
+        stream_handler.propagate = False
+        
+        self.logger.addHandler(stream_handler)
+        
+    def setup_file_logger(self, station, save_dir):
+        logging_fn = save_dir.joinpath("sb_archiving.log")
+        file_handler = logging.FileHandler(filename=logging_fn, 
+                                           mode="w")
+        file_handler.setFormatter(LOG_FORMAT)
+        file_handler.setLevel(logging.DEBUG)
+        file_handler.propagate = False
+        
+        self.logger.addHandler(file_handler)
+        
+    def read_cfg_file(self, fn):
+        """
+        Read a configuration file
 
-    geo_db = gpd.GeoDataFrame(survey_db, crs=crs, geometry=geometry)
+        Parameters
+        ----------
+        fn : TYPE
+            DESCRIPTION.
 
-    geo_db.to_file(save_fn)
+        Returns
+        -------
+        None.
 
-    print("*** Wrote survey shapefile to {0}".format(save_fn))
-    return survey_db, save_fn
+        """
+        fn = Path(fn)
+        if not fn.exists():
+            raise IOError(f"Could not find {fn}")
+        cfg_obj = ConfigParser()
+        cfg_obj.read_file(fn.open())
+        return cfg_obj._sections
+        
+    def copy_edi_file(self, station, edi_fn):
+        """
+        
 
+        Parameters
+        ----------
+        station : TYPE
+            DESCRIPTION.
+        edi_fn : TYPE
+            DESCRIPTION.
 
-# =============================================================================
-# Science Base Functions
-# =============================================================================
-def sb_locate_child_item(sb_session, station, sb_page_id):
-    """
-    See if there is a child item already for the given station.  If there is
-    not an existing child item returns False.
+        Returns
+        -------
+        None.
 
-    :param sb_session: sciencebase session object
-    :type sb_session: sciencebasepy.SbSession
-
-    :param station: station to archive
-    :type station: string
-
-    :param sb_page_id: page id of the sciencebase database to download to
-    :type sb_page_id: string
-
-    :returns: page id for the station child item
-    :rtype: string or False
-    """
-    for item_id in sb_session.get_child_ids(sb_page_id):
-        ### for some reason there is a child item that doesn't play nice
-        ### so have to skip it
-        try:
-            item_title = sb_session.get_item(item_id, {"fields": "title"})["title"]
-        except:
-            continue
-        if station in item_title:
-            return item_id
-
-    return False
-
-
-def sb_sort_fn_list(fn_list):
-    """
-    sort the file name list to xml, edi, png
-
-    :param fn_list: list of files to sort
-    :type fn_list: list
-
-    :returns: sorted list ordered by xml, edi, png, zip files
-    """
-
-    fn_list_sort = [None, None, None]
-    index_dict = {"xml": 0, "edi": 1, "png": 2}
-
-    for ext in ["xml", "edi", "png"]:
-        for fn in fn_list:
-            if fn.endswith(ext):
-                fn_list_sort[index_dict[ext]] = fn
-                fn_list.remove(fn)
-                break
-    fn_list_sort += sorted(fn_list)
-
-    # check to make sure all the files are there
-    if fn_list_sort[0] is None:
-        print("\t\t!! No .xml file found !!")
-    if fn_list_sort[1] is None:
-        print("\t\t!! No .edi file found !!")
-    if fn_list_sort[2] is None:
-        print("\t\t!! No .png file found !!")
-
-    # get rid of any Nones in the list in case there aren't all the files
-    fn_list_sort[:] = (value for value in fn_list_sort if value is not None)
-
-    return fn_list_sort
-
-
-def sb_session_login(sb_session, sb_username, sb_password=None):
-    """
-    login in to sb session using the input credentials.  Checks to see if
-    you are already logged in.  If no password is given, the password will be
-    requested through the command prompt.
-
-    .. note:: iPython shells will echo your password.  Use a Python command
-              shell to not have your password echoed.
-
-    :param sb_session: sciencebase session object
-    :type sb_session: sciencebasepy.SbSession
-
-    :param sb_username: sciencebase username, typically your full USGS email
-    :type sb_username: string
-
-    :param sb_password: AD password
-    :type sb_password: string
-
-    :returns: logged in sciencebasepy.SbSession
-    """
-
-    if not sb_session.is_logged_in():
-        if sb_password is None:
-            sb_session.loginc(sb_username)
-        else:
-            sb_session.login(sb_username, sb_password)
-        time.sleep(5)
-
-    return sb_session
-
-
-def sb_get_fn_list(archive_dir, f_types=[".zip", ".edi", ".png", ".xml", ".mth5"]):
-    """
-    Get the list of files to archive looking for .zip, .edi, .png within the
-    archive directory.  Sorts in the order of xml, edi, png, zip
-
-    :param archive_dir: full path to the directory to be archived
-    :type archive_dir: string
-
-    :returns: list of files to archive ordered by xml, edi, png, zip
-
-    """
-    fn_list = []
-    for f_type in f_types:
-        fn_list += glob.glob(os.path.join(archive_dir, "*{0}".format(f_type)))
-
-    return sb_sort_fn_list(fn_list)
-
-
-def sb_upload_data(
-    sb_page_id,
-    archive_station_dir,
-    sb_username,
-    sb_password=None,
-    f_types=[".zip", ".edi", ".png", ".xml", ".mth5"],
-    child_xml=None,
-):
-    """
-    Upload a given archive station directory to a new child item of the given
-    sciencebase page.
-
-    .. note:: iPython shells will echo your password.  Use a Python command
-              shell to not have your password echoed.
-
-
-    :param sb_page_id: page id of the sciencebase database to download to
-    :type sb_page_id: string
-
-    :param archive_station_dir: full path to the station directory to archive
-    :type archive_station_dir: string
-
-    :param sb_username: sciencebase username, typically your full USGS email
-    :type sb_username: string
-
-    :param sb_password: AD password
-    :type sb_password: string
-
-    :returns: child item created on the sciencebase page
-    :rtype: dictionary
-
-    :Example: ::
-        >>> import mtpy.usgs.usgs_archive as archive
-        >>> sb_page = 'sb_page_number'
-        >>> child_item = archive.sb_upload_data(sb_page,
-                                                r"/home/mt/archive_station",
-                                                'jdoe@usgs.gov')
-    """
-    ### initialize a session
-    session = sb.SbSession()
-
-    ### login to session, note if you run this in a console your password will
-    ### be visible, otherwise run from a command line > python sciencebase_upload.py
-    sb_session_login(session, sb_username, sb_password)
-
-    station = os.path.basename(archive_station_dir)
-
-    ### File to upload
-    if child_xml:
-        f_types.remove(".xml")
-    upload_fn_list = sb_get_fn_list(archive_station_dir, f_types=f_types)
-
-    ### check if child item is already created
-    child_id = sb_locate_child_item(session, station, sb_page_id)
-    ## it is faster to remove the child item and replace it all
-    if child_id:
-        session.delete_item(session.get_item(child_id))
-        sb_action = "Updated"
-
-    else:
-        sb_action = "Created"
-
-    ### make a new child item
-    new_child_dict = {
-        "title": "station {0}".format(station),
-        "parentId": sb_page_id,
-        "summary": "Magnetotelluric data",
-    }
-    new_child = session.create_item(new_child_dict)
-
-    if child_xml:
-        child_xml.update_child(new_child)
-        child_xml.save(os.path.join(archive_station_dir, f"{station}.xml"))
-        upload_fn_list.append(child_xml.fn.as_posix())
-
-    # sort list so that xml, edi, png, zip files
-    # upload data
-    try:
-        item = session.upload_files_and_upsert_item(new_child, upload_fn_list)
-    except:
-        sb_session_login(session, sb_username, sb_password)
-        # if you want to keep the order as read on the sb page,
-        # need to reverse the order cause it sorts by upload date.
-        for fn in upload_fn_list[::-1]:
+        """
+        if self.edi_dir:
             try:
-                item = session.upload_file_to_item(new_child, fn)
-            except:
-                print("\t +++ Could not upload {0} +++".format(fn))
-                continue
+                shutil.copy(self.edi_dir.joinpath(f"{station}.edi"), edi_fn)
+            except Exception as error:
+                self.logger.error(error)
+            
+    def copy_png_file(self, station, png_fn):
+        """
+        
 
-    print("==> {0} child for {1}".format(sb_action, station))
+        Parameters
+        ----------
+        station : TYPE
+            DESCRIPTION.
+        png_fn : TYPE
+            DESCRIPTION.
 
-    session.logout()
+        Returns
+        -------
+        None.
 
-    return item
+        """
+        if self.png_dir: 
+            try:
+                shutil.copy(self.png_dir.joinpath(f"{station}.png"), png_fn)
+            except Exception as error:
+                self.logger.error(error)
+                
+    def copy_xml_file(self, station, xml_fn):
+        """
+        
+
+        Parameters
+        ----------
+        station : TYPE
+            DESCRIPTION.
+        xml_fn : TYPE
+            DESCRIPTION.
+
+        Returns
+        -------
+        None.
+
+        """
+        if self.xml_dir: 
+            try:
+                shutil.copy(self.xml_dir.joinpath(f"{station}.xml"), xml_fn)
+            except Exception as error:
+                self.logger.error(error)
+                
+    def setup_station_archive_dir(self, station_dir):
+        """
+        Setup the directory structure for the archive 
+        
+        survey_dir/Archive/station
+
+        Parameters
+        ----------
+        station : TYPE
+            DESCRIPTION.
+
+        Returns
+        -------
+        None.
+
+        """
+        station = station_dir.stem
+        if not self.survey_dir:
+            self.survey_dir = station_dir.parent
+        if not self.archive_dir:
+            self.archive_dir = self.survey_dir.joinpath("Archive")
+            if not self.archive_dir.exists():
+                self.archive_dir.mkdir()
+        
+        save_station_dir = self.archive_dir.joinpath(station)
+        if not save_station_dir.exists():
+            save_station_dir.mkdir()
+            
+        self.setup_file_logger(station, save_station_dir)
+            
+        return station, save_station_dir
+    
+    def make_child_xml(self, run_df, survey_df=None, **kwargs):
+        """
+        Make a child XML file for a single station
+
+        Parameters
+        ----------
+        run_df : TYPE
+            DESCRIPTION.
+        xml_child_template : TYPE, optional
+            DESCRIPTION. The default is None.
+        **kwargs: TYPE
+            Can include xml_child_template, xml_cfg_fn
+
+        Returns
+        -------
+        None.
+
+        """
+        for k, v in kwargs.items():
+            setattr(self, k, v)
+        
+        s_xml = mt_xml.MTSBXML()
+        if self.xml_child_template:
+            s_xml.read_template_xml(self.xml_child_template)
+        if self.xml_cfg_fn:
+            s_xml.update_from_config(self.xml_cfg_fn)
+
+        s_xml.update_with_station(station)
+
+        # location
+        if survey_df:
+            s_xml.update_bounding_box(
+                survey_df.longitude.max(),
+                survey_df.longitude.min(),
+                survey_df.latitude.max(),
+                survey_df.latitude.min(),
+            )
+        else:
+            s_xml.update_bounding_box(
+                run_df.longitude.max(),
+                _df.longitude.min(),
+                survey_df.latitude.max(),
+                survey_df.latitude.min(),
+            )
+
+        # start and end time
+        s_xml.update_time_period(run_df.start.min().isoformat(),
+                                  run_df.end.max().isoformat())
+
+        # write station xml
+        s_xml.save(save_station_dir.joinpath(f"{station}.xml"))
+        if not make_xml and xml_path:
+            shutil.copy(
+                xml_path.joinpath(f"{station}.xml"),
+                save_station_dir.joinpath, f"{station}.xml",
+            )
+
+    def archive_station(self, station_dir, make_xml=True, upload_data=False,
+                       survey_df=None, **kwargs):
+        """
+        Archive a single station
+
+        Parameters
+        ----------
+        station_dir : TYPE
+            DESCRIPTION.
+        make_xml : TYPE, optional
+            DESCRIPTION. The default is True.
+        upload_data : TYPE, optional
+            DESCRIPTION. The default is False.
+        **kwargs : TYPE
+            DESCRIPTION.
+
+        Raises
+        ------
+        ValueError
+            DESCRIPTION.
+
+        Returns
+        -------
+        None.
+
+        """
+        for k, v in kwargs.items:
+            setattr(self, k, v)
+        
+        station_dir = Path(station_dir)
+        station, save_station_dir = self.setup_station_archive_dir(station_dir)
+        
+        ### get the file names for each block of z3d files if none skip
+        zc = z3d_collection.Z3DCollection(station_dir)
+        try:
+            fn_df = zc.get_z3d_df(calibration_path=self.calibration_dir)
+        except ValueError as error:
+            msg = "folder %s because no Z3D files"
+            self.logger.error("folder %s because no Z3D files", station)
+            self.logger.error(str(error))
+            raise ArchiveError(msg % station)
+
+        self.logger.info("--- Archiving Station %s ---", station)
+        ### capture output to put into a log file
+        station_st = datetime.datetime.now()
+        self.logger.info("Started archiving %s at %s", station, station_st)
+        
+        ### copy edi and png into archive director
+        edi_fn = save_station_dir.joinpath(f"{station}.edi")
+        png_fn = save_station_dir.joinpath(f"{station}.png")
+        if not edi_fn.is_file():
+            self.copy_edi_file(station, edi_fn)
+        if not png_fn.is_file():
+            self.copy_png_file(station, png_fn)                
+    
+        ### Make MTH5 File
+        m = MTH5(shuffle=self.mth5_shuffle,
+                  fletcher32=self.mth5_fletcher,
+                  compression=self.mth5_compression,
+                  compression_opts=self.mth5_compression_level)
+        mth5_fn = save_station_dir.joinpath(f"{station}.h5")
+        m.open_mth5(mth5_fn, "w")
+        if not m.h5_is_write:
+            msg = "Something went wrong with opening %, check logs"
+            self.logger.error(msg, mth5_fn)
+            raise ArchiveError(msg % mth5_fn)
+    
+        ### loop over schedule blocks
+        for run_num in fn_df.run.unique():
+            run_df = fn_df.loc[fn_df.run == run_num]
+            runts_obj, filters_list = zc.make_runts(run_df, 
+                                                    self.logger,
+                                                    self.cfg_dict)
+            run_df.loc[:, ("end")] = pd.Timestamp(runts_obj.run_metadata.time_period.end)
+            # add station
+            station_group = m.add_station(
+                runts_obj.station_metadata.id,
+                station_metadata=runts_obj.station_metadata,
+            )
+    
+            # add run
+            run_group = station_group.add_run(runts_obj.run_metadata.id,
+                                              runts_obj.run_metadata)
+            channels = run_group.from_runts(runts_obj, chunks=self.mth5_chunks)
+            run_group.validate_run_metadata()
+    
+            # need to update metadata
+            station_group.validate_station_metadata()
+            
+            for f in filters_list:
+                m.filters_group.add_filter(f)
+        
+        if survey_df:
+            survey_df.loc[survey_df.station==runts_obj.station_metadata.id, "end"] = \
+                pd.Timestamp(station_group.metadata.time_period.end)
+                
+        # update survey metadata from data and cfg file
+        try:
+            m.survey_group.update_survey_metadata(survey_dict=self.cfg_dict["survey"])
+        except KeyError:
+            m.survey_group.update_survey_metadata()
+    
+        m.close_mth5()
+        ####------------------------------------------------------------------
+        #### Make xml file for science base
+        ####------------------------------------------------------------------
+        # make xml file
+        if make_xml:
+            s_xml = mt_xml.MTSBXML()
+            if self.xml_child_template:
+                s_xml.read_template_xml(xml_child_template)
+            if xml_cfg_fn:
+                s_xml.update_from_config(xml_cfg_fn)
+    
+            s_xml.update_with_station(station)
+    
+            # location
+            s_xml.update_bounding_box(
+                survey_df.longitude.max(),
+                survey_df.longitude.min(),
+                survey_df.latitude.max(),
+                survey_df.latitude.min(),
+            )
+    
+            # start and end time
+            s_xml.update_time_period(run_df.start.min().isoformat(),
+                                      run_df.end.max().isoformat())
+    
+            # write station xml
+            s_xml.save(save_station_dir.joinpath(f"{station}.xml"))
+        if not make_xml and xml_path:
+            shutil.copy(
+                xml_path.joinpath(f"{station}.xml"),
+                save_station_dir.joinpath, f"{station}.xml",
+            )
+    
+        station_et = datetime.datetime.now()
+        t_diff = station_et - station_st
+        print("Took --> {0:.2f} seconds".format(t_diff.total_seconds()))
+    
+        ####------------------------------------------------------------------
+        #### Upload data to science base
+        #### -----------------------------------------------------------------
+        if upload_data:
+            try:
+                archive.sb_upload_data(
+                    page_id, save_station_dir, username, password, f_types=upload_files
+                )
+            except Exception as error:
+                print("xxx FAILED TO UPLOAD {0} xxx".format(station))
+                print(error)
+
+    
+
