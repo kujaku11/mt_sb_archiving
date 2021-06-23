@@ -518,8 +518,9 @@ class SBMTArcive:
         for run_num in fn_df.run.unique():
             run_df = fn_df.loc[fn_df.run == run_num]
             runts_obj, filters_list = zc.make_runts(run_df,
-                                                    None,
-                                                    self.cfg_dict)
+                                                    logger_file_handler=None,
+                                                    config_dict=self.cfg_dict,
+                                                    survey_csv_fn=self.csv_fn)
             run_df.loc[:, ("end")] = pd.Timestamp(
                 runts_obj.run_metadata.time_period.end)
             # add station
@@ -618,11 +619,12 @@ class SBMTArcive:
                                             **kwargs)
                 if copy_files:
                     self.copy_files_to_archive_dir(archive_station_dir, station)
+                print("\a")
             except ArchiveError as error:
                 print("Skipping %s, %s" % (station_dir.name, error))
                 # self.logger.warning("Skipping %s, %s", station_dir.name, error)
 
-            print("\a")
+            
         if summarize:
             ### write shape file
             shp_df, shp_fn = survey_zc.write_shp_file(survey_df)

@@ -169,6 +169,37 @@ class Z3DCollection(object):
             "type": str,
         }
         
+        self._csv_ch_translation = {
+            "ex_length": "ex.dipole_length",
+            "ex_azimuth": "ex.measurement_azimuth",
+            "ex_ch_num": "ex.channel_number",
+            "ex_cres_start": "ex.contact_resistance.start",
+            "ex_cres_end": "ex.contact_resistance.end",
+            "ex_id": ["ex.positive.id", "ex.negative.id"],
+            "ey_azimuth": "ey.measurement_azimuth",
+            "ey_ch_num": "ey.channel_number",
+            "ey_cres_start": "ey.contact_resistance.start",
+            "ey_cres_end": "ey.contact_resistance.end",
+            "ey_id": ["ey.positive.id", "ey.negative.id"],
+            "hx_sensor": "hx.sensor.id",
+            "hx_azimuth": "hx.measurement_azimuth",
+            "hx_ch_num": "hx.channel_number",
+            "hy_sensor": "hy.sensor.id",
+            "hy_azimuth": "hy.measurement_azimuth",
+            "hy_ch_num": "hy.channel_number",
+            "hz_sensor": "hz.sensor.id",
+            "hz_azimuth": "hz.measurement_azimuth",
+            "hz_ch_num": "hz.channel_number",
+            "data_logger": "run.data_logger.id",
+            "battery": "run.data_logger.power_source.id",
+            "battery_start": "run.data_logger.power_source.voltage.start",
+            "battery_end": "run.data_logger.power_source.voltage.end",
+            "operator": ["run.acquired_by.author",
+                         "station.acquired_by.author",
+                         "run.metadata_by.author"],
+            "type": ["station.data_type", "run.data_type"],
+        }
+        
     @property
     def z3d_path(self):
         """
@@ -311,7 +342,8 @@ class Z3DCollection(object):
 
         return z3d_df
 
-    def make_runts(self, run_df, logger_file_handler=None, config_dict={}):
+    def make_runts(self, run_df, logger_file_handler=None, config_dict={},
+                   survey_csv_fn=None):
         """
         Create a RunTS object given a Dataframe of channels
         
@@ -326,20 +358,27 @@ class Z3DCollection(object):
         for entry in run_df.itertuples():
             ch_obj = zen.read_z3d(entry.fn_z3d, 
                                   logger_file_handler=logger_file_handler)
+            
+            if survey_csv_fn:
+                cfg_dict = self.get_station_from_csv(survey_csv_fn, 
+                                                     entry.station)
+                config_dict[ch_obj.component].update(cfg_dict[ch_obj.component])
+                config_dict["run"].update(cfg_dict["run"])
+                config_dict["station"].update(cfg_dict["station"])
+
             try:
                 ch_dict = config_dict[ch_obj.component]
                 ch_obj.channel_metadata.from_dict(ch_dict, skip_none=True)
             except KeyError:
                 pass
-            
+
             if entry.cal_fn not in [0, "0"]:
                 if not ch_obj.channel_response_filter:
                     fap_obj = self._make_fap_filter(entry.cal_fn)
                     filter_object_list.append(fap_obj)
                     ch_obj.channel_metadata.filter.name.append(fap_obj.name)
                     ch_obj.channel_metadata.filter.applied.append(False)
-                
-                
+
             ch_obj.run_metadata.id = f"{run_df.run.unique()[0]:03d}"
             ch_list.append(ch_obj)
             
@@ -460,6 +499,29 @@ class Z3DCollection(object):
 
         return summary_df
     
+    def get_station_from_csv(self, csv_fn, station):
+        df = pd.read_csv(csv_fn)
+        
+        sdf = df.loc[df.station==station]
+        if len(sdf) == 0:
+            print(f"Could not find {station} in {csv_fn}")
+            
+        cfg_dict = dict([(k, {}) for k in ["station", "run", "ex", "ey", "hx", "hy", "hz"]])
+        entry = [entry for entry in sdf.itertuples()][0]
+        for key, metadata_key in self._csv_ch_translation.items():
+            entry_value = getattr(entry, key)
+            if isinstance(metadata_key, list):
+                for mkey in metadata_key:
+                    dkey = mkey.split(".", 1)[0]
+                    dvalue = mkey.split(".", 1)[1]
+                    cfg_dict[dkey][dvalue] = entry_value
+            else:
+                dkey = metadata_key.split(".", 1)[0]
+                dvalue = metadata_key.split(".", 1)[1]
+                cfg_dict[dkey][dvalue] = entry_value
+                
+        return cfg_dict
+                
     def write_shp_file(self, survey_df, save_path=None):
         """
         
