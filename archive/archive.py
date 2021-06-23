@@ -531,7 +531,7 @@ class SBMTArcive:
             # add run
             run_group = station_group.add_run(runts_obj.run_metadata.id,
                                               runts_obj.run_metadata)
-            channels = run_group.from_runts(runts_obj, chunks=self.mth5_chunks)
+            _ = run_group.from_runts(runts_obj, chunks=self.mth5_chunks)
             run_group.validate_run_metadata()
 
             # need to update metadata
@@ -540,6 +540,8 @@ class SBMTArcive:
             for f in filters_list:
                 m.filters_group.add_filter(f)
 
+        run_df.to_csv(save_station_dir.joinpath(f"{station}_summary.csv"),
+                      index=False)
         # update survey metadata from data and cfg file
         try:
             m.survey_group.update_survey_metadata(
@@ -649,6 +651,9 @@ class SBMTArcive:
         
             ### --> write survey xml file
             survey_xml.save(self.archive_dir.joinpath("parent_page.xml"))
+            
+            survey_df.to_csv(self.archive_dir.joinpath("survey_summary.csv"),
+                             index=False)
 
         if upload:
             if not page_id or not username or not password:
