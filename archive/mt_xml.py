@@ -18,9 +18,9 @@ class MTSBXML(xml_utils.XMLRecord):
     """
     Class to make it easier to create and manipulate Sciencebase metadata XML files
     that adhere to the FGDC standards.
-    
+
     Based on pymdwizard https://github.com/usgs/fort-pymdwizard/tree/master
-    
+
     """
 
     def __init__(self, fn=None):
@@ -32,10 +32,10 @@ class MTSBXML(xml_utils.XMLRecord):
     def read_template_xml(self, template_fn):
         """
         Read in a template xml that can be updated later
-        
+
         :param template_fn: Full path to template XML file
         :type template_fn: string or Path
-        :return: fills 
+        :return: fills
         :rtype: TYPE
 
         """
@@ -185,7 +185,7 @@ class MTSBXML(xml_utils.XMLRecord):
         xml_utils.XMLNode(tag="onlink", text=config_object["doi"], parent_node=citation)
 
     def _update_description(self, config_object):
-        """ 
+        """
         update description
         """
         if "purpose" in config_object.keys():
@@ -275,7 +275,7 @@ class MTSBXML(xml_utils.XMLRecord):
 
     def _update_constraints(self, constraint_string):
         """
-        
+
         :param constraint_string: DESCRIPTION
         :type constraint_string: TYPE
         :return: DESCRIPTION
@@ -288,7 +288,7 @@ class MTSBXML(xml_utils.XMLRecord):
     def _update_contact(self, config_object):
         """
         Update ptcontact and metc
-        
+
         :param config_object: DESCRIPTION
         :type config_object: TYPE
         :return: DESCRIPTION
@@ -346,8 +346,8 @@ class MTSBXML(xml_utils.XMLRecord):
         self.metadata.idinfo.ptcontac.cntinfo.cntvoice.text = config_object["phone"]
         self.metadata.metainfo.metc.cntinfo.cntvoice.text = config_object["phone"]
 
-        #self.metadata.idinfo.ptcontac.cntinfo.cntfax.text = config_object["fax"]
-        #self.metadata.metainfo.metc.cntinfo.cntfax.text = config_object["fax"]
+        # self.metadata.idinfo.ptcontac.cntinfo.cntfax.text = config_object["fax"]
+        # self.metadata.metainfo.metc.cntinfo.cntfax.text = config_object["fax"]
 
         self.metadata.idinfo.ptcontac.cntinfo.cntemail.text = config_object["email"]
         self.metadata.metainfo.metc.cntinfo.cntemail[0].text = config_object["email"]
@@ -405,7 +405,7 @@ class MTSBXML(xml_utils.XMLRecord):
             count = len(self.metadata.eainfo.detailed.attr)
         except AttributeError:
             count = 0
-            
+
         for ii, ext in enumerate(["edi", "png", "guide"]):
             overview = xml_utils.XMLNode(
                 tag="overview", parent_node=self.metadata.eainfo, index=ii + count
@@ -427,9 +427,9 @@ class MTSBXML(xml_utils.XMLRecord):
 
     def update_dates(self, date=None):
         """
-        Update release and metadata dates to input date or if not input the current 
+        Update release and metadata dates to input date or if not input the current
         date
-        
+
         :param date: DESCRIPTION, defaults to None
         :type date: TYPE, optional
         :return: DESCRIPTION
@@ -447,7 +447,7 @@ class MTSBXML(xml_utils.XMLRecord):
     def update_time_period(self, start, end):
         """
         Update time period start and end times
-        
+
         :param start: DESCRIPTION
         :type start: TYPE
         :param end: DESCRIPTION
@@ -490,18 +490,18 @@ class MTSBXML(xml_utils.XMLRecord):
         Update information from a child item
         """
         self.metadata.distinfo.resdesc.text = child_item["link"]["url"]
-        
+
     def update_shp_attributes(self, df):
         """
         Update the bounds on shapefile attributes from the survey dataframe
-        
+
         :param df: DESCRIPTION
         :type df: TYPE
         :return: DESCRIPTION
         :rtype: TYPE
 
         """
-        
+
         for attr in self.metadata.eainfo.detailed.attr:
             label = attr.attrlabl.text
             try:
@@ -513,7 +513,7 @@ class MTSBXML(xml_utils.XMLRecord):
                 except AttributeError as error:
                     # print(f"Attribute {label} does not have rdom, {error}")
                     pass
-                
+
             except KeyError:
                 # print(f"could not find {label} in dataframe, skipping")
                 pass
@@ -521,13 +521,12 @@ class MTSBXML(xml_utils.XMLRecord):
                 # print(f"Could convert {label}, {error}")
                 pass
 
-
     def update_with_station(self, station):
         """
         Update places where {STATION} is set as a place holder in the child
         item.
-        
-        title, abstract, files names, 
+
+        title, abstract, files names,
 
         Parameters
         ----------
@@ -539,33 +538,41 @@ class MTSBXML(xml_utils.XMLRecord):
         None.
 
         """
-        
-        # add station name to title and abstract
-        self.metadata.idinfo.citation.citeinfo.title.text = self.metadata.idinfo.citation.citeinfo.title.text.replace("{STATION}", station)
 
-        self.metadata.idinfo.descript.abstract.text = self.metadata.idinfo.descript.abstract.text.replace(
-            "{STATION}", station
+        # add station name to title and abstract
+        self.metadata.idinfo.citation.citeinfo.title.text = (
+            self.metadata.idinfo.citation.citeinfo.title.text.replace(
+                "{STATION}", station
+            )
+        )
+
+        self.metadata.idinfo.descript.abstract.text = (
+            self.metadata.idinfo.descript.abstract.text.replace("{STATION}", station)
         )
 
         # add list of files
         # add list of files
-        self.metadata.idinfo.descript.supplinf.text = self.metadata.idinfo.descript.supplinf.text.replace(
-            "{STATION_FILES}",
-            "\n\t\t\t".join(
-                [
-                    f"{station}.edi",
-                    f"{station}.png",
-                    f"{station}.h5",
-                ]
-            ),
+        self.metadata.idinfo.descript.supplinf.text = (
+            self.metadata.idinfo.descript.supplinf.text.replace(
+                "{STATION_FILES}",
+                "\n\t\t\t".join(
+                    [
+                        f"{station}.edi",
+                        f"{station}.png",
+                        f"{station}.h5",
+                    ]
+                ),
+            )
         )
 
         for ii in range(3):
-            self.metadata.eainfo.overview[ii].eaover.text = self.metadata.eainfo.overview[ii].eaover.text.replace(
+            self.metadata.eainfo.overview[
+                ii
+            ].eaover.text = self.metadata.eainfo.overview[ii].eaover.text.replace(
                 "{STATION}", station
             )
-            self.metadata.eainfo.overview[ii].eadetcit.text = self.metadata.eainfo.overview[ii].eadetcit.text.replace(
+            self.metadata.eainfo.overview[
+                ii
+            ].eadetcit.text = self.metadata.eainfo.overview[ii].eadetcit.text.replace(
                 "{STATION}", station
             )
-    
-        

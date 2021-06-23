@@ -25,6 +25,7 @@ import geopandas as gpd
 from shapely.geometry import Point
 
 from mth5.io import zen
+
 # from mth5.io.reader import read_file
 from mth5.timeseries import RunTS
 
@@ -41,7 +42,7 @@ class Z3DCollectionError(Exception):
 class Z3DCollection(object):
     """
     Collects .z3d files into useful arrays and lists
-    
+
     ================= ============================= ===========================
     Attribute         Description                   Default
     ================= ============================= ===========================
@@ -51,7 +52,7 @@ class Z3DCollection(object):
     leap_seconds      number of leap seconds for    16 [2016]
                       a given year
     ================= ============================= ===========================
-    
+
     ===================== =====================================================
     Methods               Description
     ===================== =====================================================
@@ -63,20 +64,20 @@ class Z3DCollection(object):
     get_chn_order         Get the appropriate channels, in case some are
                           missing
     ===================== =====================================================
-    
+
     :Example: ::
-    
+
         >>> import mtpy.usgs.usgs_archive as archive
         >>> z3d_path = r"/Data/Station_00"
         >>> zc = archive.Z3DCollection()
         >>> fn_list = zc.get_time_blocks(z3d_path)
-    
+
     """
 
     def __init__(self, z3d_path=None):
         self.z3d_path = z3d_path
         self.chn_order = ["hx", "ex", "hy", "ey", "hz"]
-        
+
         self._keys_dict = {
             "station": "station",
             "start": "start",
@@ -95,9 +96,9 @@ class Z3DCollection(object):
             "run": "run",
             "zen_num": "zen_num",
             "cal_fn": "cal_fn",
-            "channel_number": 'channel_number', 
+            "channel_number": "channel_number",
         }
-        
+
         self._dtypes = {
             "station": str,
             "start": str,
@@ -120,7 +121,7 @@ class Z3DCollection(object):
             "operator": str,
             "quality": int,
         }
-        
+
         self._summary_dtypes = {
             "station": str,
             "start": str,
@@ -128,7 +129,7 @@ class Z3DCollection(object):
             "latitude": float,
             "longitude": float,
             "elevation": float,
-            "components":str, 
+            "components": str,
             "n_runs": int,
             "n_runs_4096": int,
             "n_runs_1024": int,
@@ -168,7 +169,7 @@ class Z3DCollection(object):
             "operator": str,
             "type": str,
         }
-        
+
         self._csv_ch_translation = {
             "ex_length": "ex.dipole_length",
             "ex_azimuth": "ex.measurement_azimuth",
@@ -194,12 +195,14 @@ class Z3DCollection(object):
             "battery": "run.data_logger.power_source.id",
             "battery_start": "run.data_logger.power_source.voltage.start",
             "battery_end": "run.data_logger.power_source.voltage.end",
-            "operator": ["run.acquired_by.author",
-                         "station.acquired_by.author",
-                         "run.metadata_by.author"],
+            "operator": [
+                "run.acquired_by.author",
+                "station.acquired_by.author",
+                "run.metadata_by.author",
+            ],
             "type": ["station.data_type", "run.data_type"],
         }
-        
+
     @property
     def z3d_path(self):
         """
@@ -219,7 +222,7 @@ class Z3DCollection(object):
             self._z3d_path = None
         else:
             self._z3d_path = Path(z3d_path)
-    
+
     def get_z3d_fn_list(self, z3d_path=None):
         """
         Get a list of z3d files in a given directory
@@ -247,7 +250,7 @@ class Z3DCollection(object):
             if fn_path.suffix in [".z3d", ".Z3D"]
         ]
         return z3d_list
-    
+
     def get_calibrations(self, calibration_path):
         """
         get coil calibrations
@@ -272,7 +275,7 @@ class Z3DCollection(object):
             calibration_dict[cal_num] = cal_fn
 
         return calibration_dict
-    
+
     def get_z3d_df(self, z3d_path=None, calibration_path=None):
         """
         Get general z3d information and put information in a dataframe
@@ -293,7 +296,7 @@ class Z3DCollection(object):
 
         """
         z3d_fn_list = self.get_z3d_fn_list(z3d_path)
-        
+
         if len(z3d_fn_list) < 1:
             raise ValueError("No Z3D files found")
 
@@ -302,7 +305,7 @@ class Z3DCollection(object):
         for z3d_fn in z3d_fn_list:
             z3d_obj = zen.Z3D(z3d_fn)
             z3d_obj.read_all_info()
-            #z3d_obj.start = z3d_obj.zen_schedule.isoformat()
+            # z3d_obj.start = z3d_obj.zen_schedule.isoformat()
             # set some attributes to null to fill later
             z3d_obj.n_samples = 0
             z3d_obj.block = 0
@@ -335,18 +338,19 @@ class Z3DCollection(object):
             starts = sorted(z3d_df[z3d_df.sample_rate == sr].start.unique())
             for block_num, start in enumerate(starts):
                 z3d_df.loc[(z3d_df.start == start), "block"] = block_num
-                
+
         # assign run number
         for ii, start in enumerate(sorted(z3d_df.start.unique())):
             z3d_df.loc[(z3d_df.start == start), "run"] = ii
 
         return z3d_df
 
-    def make_runts(self, run_df, logger_file_handler=None, config_dict={},
-                   survey_csv_fn=None):
+    def make_runts(
+        self, run_df, logger_file_handler=None, config_dict={}, survey_csv_fn=None
+    ):
         """
         Create a RunTS object given a Dataframe of channels
-        
+
         :param run_df: DESCRIPTION
         :type run_df: TYPE
         :return: DESCRIPTION
@@ -356,12 +360,10 @@ class Z3DCollection(object):
         ch_list = []
         filter_object_list = []
         for entry in run_df.itertuples():
-            ch_obj = zen.read_z3d(entry.fn_z3d, 
-                                  logger_file_handler=logger_file_handler)
-            
+            ch_obj = zen.read_z3d(entry.fn_z3d, logger_file_handler=logger_file_handler)
+
             if survey_csv_fn:
-                cfg_dict = self.get_station_from_csv(survey_csv_fn, 
-                                                     entry.station)
+                cfg_dict = self.get_station_from_csv(survey_csv_fn, entry.station)
                 config_dict[ch_obj.component].update(cfg_dict[ch_obj.component])
                 config_dict["run"].update(cfg_dict["run"])
                 config_dict["station"].update(cfg_dict["station"])
@@ -381,16 +383,16 @@ class Z3DCollection(object):
 
             ch_obj.run_metadata.id = f"{run_df.run.unique()[0]:03d}"
             ch_list.append(ch_obj)
-            
+
             filter_object_list += ch_obj.channel_response_filter.filters_list
-        
+
         run_obj = RunTS(array_list=ch_list)
         try:
             run_dict = config_dict["run"]
-            run_obj.run_metadata.from_dict(run_dict, skip_none=True) 
+            run_obj.run_metadata.from_dict(run_dict, skip_none=True)
         except KeyError:
             pass
-        
+
         try:
             station_dict = config_dict["station"]
             run_obj.station_metadata.from_dict(station_dict, skip_none=True)
@@ -398,27 +400,27 @@ class Z3DCollection(object):
             pass
 
         return run_obj, filter_object_list
-    
+
     def _make_fap_filter(self, cal_fn):
         """
         make a FAP filter object from calibration file
         """
-        
+
         cal_fn = Path(cal_fn)
         if not cal_fn.exists():
             raise IOError(f"Could not find {cal_fn}")
-        
+
         fap_df = pd.read_csv(cal_fn)
         fap = FrequencyResponseTableFilter()
         fap.units_in = "millivolts"
         fap.units_out = "nanotesla"
         fap.name = f"ant4_{cal_fn.stem}_response"
-        fap.amplitudes = np.sqrt(fap_df.real**2 + fap_df.imaginary**2).to_numpy()
+        fap.amplitudes = np.sqrt(fap_df.real ** 2 + fap_df.imaginary ** 2).to_numpy()
         fap.phases = np.rad2deg(np.arctan2(fap_df.imaginary, fap_df.real).to_numpy())
         fap.frequencies = fap_df.frequency.to_numpy()
-        
+
         return fap
-    
+
     def summarize_survey(self, z3d_path=None, calibration_path=None, output_fn=None):
         """
         summarize a directory of z3d files into a survey summary
@@ -436,14 +438,14 @@ class Z3DCollection(object):
         None.
 
         """
-        
+
         if z3d_path is not None:
             self.z3d_path = Path(z3d_path)
         survey_df = self.get_z3d_df(calibration_path=calibration_path)
-        
+
         entry_list = []
         for station in survey_df.station.unique():
-            station_df = survey_df.loc[survey_df.station==station]
+            station_df = survey_df.loc[survey_df.station == station]
             entry = {"station": station}
             entry["start"] = station_df.start.min()
             entry["end"] = station_df.end.max()
@@ -453,29 +455,33 @@ class Z3DCollection(object):
             entry["components"] = ",".join(list(station_df.component.unique()))
             entry["n_runs"] = len(station_df.run.unique())
             for sr in [4096, 1024, 256]:
-                entry[f"n_runs_{sr}"] = len(station_df.loc[station_df.sample_rate==sr].block.unique())
-            
+                entry[f"n_runs_{sr}"] = len(
+                    station_df.loc[station_df.sample_rate == sr].block.unique()
+                )
+
             for ec in ["ex", "ey"]:
                 e_df = station_df.loc[station_df.component == ec]
                 if len(e_df) == 0:
                     print(f"WARNING: No {ec} information for {station}")
-                entry[f"{ec}_length"] = e_df.dipole_length.median() 
+                entry[f"{ec}_length"] = e_df.dipole_length.median()
                 entry[f"{ec}_azimuth"] = e_df.azimuth.median()
                 entry[f"{ec}_ch_num"] = e_df.channel_number.median()
                 entry[f"{ec}_cres_start"] = 0
                 entry[f"{ec}_cres_end"] = 0
                 entry[f"{ec}_id"] = 0
-                
+
             for hc in ["hx", "hy", "hz"]:
                 h_df = station_df.loc[station_df.component == hc]
                 if len(h_df) == 0:
                     print(f"WARNING: No {hc} information for {station}")
-                entry[f"{hc}_sensor"] = h_df.coil_number.median() 
+                entry[f"{hc}_sensor"] = h_df.coil_number.median()
                 entry[f"{hc}_azimuth"] = h_df.azimuth.median()
                 entry[f"{hc}_ch_num"] = h_df.channel_number.median()
                 entry[f"{hc}_cal_fn"] = h_df.cal_fn.mode()[0]
-                
-            entry["sample_rates"] = ",".join([f"{ff}" for ff in station_df.sample_rate.unique()])
+
+            entry["sample_rates"] = ",".join(
+                [f"{ff}" for ff in station_df.sample_rate.unique()]
+            )
             entry["data_logger"] = station_df.zen_num.mode()[0]
             for col in ["notes", "battery"]:
                 entry[col] = ""
@@ -485,28 +491,30 @@ class Z3DCollection(object):
             entry["operator"] = station_df.operator.mode()[0]
             entry["n_chan"] = len(station_df.component.unique())
             entry["type"] = "WBMT"
-            
+
             entry_list.append(entry)
-            
+
         # make pandas dataframe and set data types
         summary_df = pd.DataFrame(entry_list)
         summary_df = summary_df.astype(self._summary_dtypes)
         summary_df.start = pd.to_datetime(summary_df.start, errors="coerce")
-        summary_df.end = pd.to_datetime(summary_df.end, errors="coerce")  
-        
+        summary_df.end = pd.to_datetime(summary_df.end, errors="coerce")
+
         if output_fn:
             summary_df.to_csv(output_fn, index=False)
 
         return summary_df
-    
+
     def get_station_from_csv(self, csv_fn, station):
         df = pd.read_csv(csv_fn)
-        
-        sdf = df.loc[df.station==station]
+
+        sdf = df.loc[df.station == station]
         if len(sdf) == 0:
             print(f"Could not find {station} in {csv_fn}")
-            
-        cfg_dict = dict([(k, {}) for k in ["station", "run", "ex", "ey", "hx", "hy", "hz"]])
+
+        cfg_dict = dict(
+            [(k, {}) for k in ["station", "run", "ex", "ey", "hx", "hy", "hz"]]
+        )
         entry = [entry for entry in sdf.itertuples()][0]
         for key, metadata_key in self._csv_ch_translation.items():
             entry_value = getattr(entry, key)
@@ -519,12 +527,12 @@ class Z3DCollection(object):
                 dkey = metadata_key.split(".", 1)[0]
                 dvalue = metadata_key.split(".", 1)[1]
                 cfg_dict[dkey][dvalue] = entry_value
-                
+
         return cfg_dict
-                
+
     def write_shp_file(self, survey_df, save_path=None):
         """
-        
+
 
         Parameters
         ----------
@@ -541,13 +549,15 @@ class Z3DCollection(object):
             DESCRIPTION.
 
         """
-        
+
         if save_path is not None:
             save_fn = save_path
         else:
             save_fn = self.z3d_path.joinpath("survey_sites.shp")
-    
-        geometry = [Point(x, y) for x, y in zip(survey_df.longitude, survey_df.latitude)]
+
+        geometry = [
+            Point(x, y) for x, y in zip(survey_df.longitude, survey_df.latitude)
+        ]
         crs = {"init": "epsg:4326"}
         # survey_db = survey_db.drop(['latitude', 'longitude'], axis=1)
         survey_df = survey_df.rename(
@@ -560,10 +570,10 @@ class Z3DCollection(object):
                 "end": "end_date",
             }
         )
-        
+
         for col in ["start_date", "end_date"]:
             survey_df[col] = survey_df.astype(str)
-    
+
         # list of columns to take from the database
         col_list = [
             "siteID",
@@ -588,16 +598,12 @@ class Z3DCollection(object):
             "start_date",
             "end_date",
         ]
-    
+
         survey_df = survey_df[col_list]
-    
+
         geo_db = gpd.GeoDataFrame(survey_df, crs=crs, geometry=geometry)
-    
+
         geo_db.to_file(save_fn)
-    
+
         print("*** Wrote survey shapefile to {0}".format(save_fn))
         return survey_df, save_fn
-        
-        
-        
-
