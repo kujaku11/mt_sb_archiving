@@ -553,6 +553,7 @@ class SBMTArcive:
         if not self.survey_dir:
             self.survey_dir = station_dir_list[0].parent
 
+        survey_df = None
         if summarize:
             survey_zc = z3d_collection.Z3DCollection(self.survey_dir)
             survey_df = survey_zc.summarize_survey(
@@ -573,7 +574,10 @@ class SBMTArcive:
                         survey_df.station == station, "end"
                     ] = station_df.end.max()
                 if make_xml:
-                    _ = self.make_child_xml(station_df, archive_station_dir, **kwargs)
+                    _ = self.make_child_xml(station_df, 
+                                            save_station_dir=archive_station_dir,
+                                            survey_df=survey_df,
+                                            **kwargs)
                 if copy_files:
                     self.copy_files_to_archive_dir(archive_station_dir, station)
                 print("\a")

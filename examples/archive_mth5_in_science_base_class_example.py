@@ -25,11 +25,11 @@ sbmt = archive.SBMTArcive()
 sbmt.survey_dir = Path(r"c:\Users\jpeacock\Documents\test_data")
 
 # MTH5 compression
-sbmt.mth5_compression = None
-sbmt.mth5_compression_level = None
-sbmt.mth5_chunks = None
-sbmt.mth5_shuffle = None
-sbmt.mth5_fletcher = None
+sbmt.mth5_compression = "gzip" # [ gzip | lfx | szip ]
+sbmt.mth5_compression_level = 5 # [0-9]
+sbmt.mth5_chunks = True # [True | chunck size number ]
+sbmt.mth5_shuffle = True # [ True | False]
+sbmt.mth5_fletcher = True # [ True | False ]
 
 sbmt.csv_fn = Path(r"c:\Users\jpeacock\Documents\test_data\Archive\survey_summary.csv")
 
@@ -37,14 +37,14 @@ sbmt.csv_fn = Path(r"c:\Users\jpeacock\Documents\test_data\Archive\survey_summar
 # this is a configuration file that has metadata explaining most of the
 # common information needed by the user.  See example files
 sbmt.cfg_fn = Path(
-    r"C:\Users\jpeacock\Documents\GitHub\mt_sb_archiving\examples\example_mth5_config.cfg"
+    r"c:\Users\jpeacock\Documents\test_data\gv_mth5_config.cfg"
 )
 sbmt.cfg_dict = sbmt.read_cfg_file(sbmt.cfg_fn)
 
 # path to xml configuration file
 # this is a file that has metadata common to the xml files that go into
 # science base, see examples files
-sbmt.xml_cfg_fn = None
+sbmt.xml_cfg_fn = r"c:\Users\jpeacock\Documents\test_data\gv_xml_configuration.cfg"
 # xml_cfg_fn = Path(r"/mnt/hgfs/MT_Data/GV2020/gv_sb_config.cfg")
 
 # path to main xml file template.  This could be made somewhere else and

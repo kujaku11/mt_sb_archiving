@@ -56,7 +56,7 @@ class MTSBXML(xml_utils.XMLRecord):
         c.read_file(cfg_fn.open())
         return c
 
-    def update_from_config(self, cfg_fn):
+    def update_from_config(self, cfg_fn, child=False):
 
         c = self.read_config(cfg_fn)
 
@@ -65,13 +65,16 @@ class MTSBXML(xml_utils.XMLRecord):
         self._run_update(self._update_description, c["general"])
         for k in ["general", "thesaurus"]:
             self._run_update(self._update_keywords, c["keywords"][k], k)
+        for k in ["common", "gnis", "terranes"]:
+            self._run_update(self._update_places, c["places"][k], k)
         for k in ["geolex", "eras"]:
             self._run_update(self._update_temporal, c["temporal"][k], k)
 
         self._run_update(self._update_constraints, c["usage"]["constraints"])
         self._run_update(self._update_contact, c["principle_investigator"])
         self._run_update(self._update_processing, c["processing"])
-        self._run_update(self._update_attachments, c["attachments"])
+        if not child:
+            self._run_update(self._update_attachments, c["attachments"])
 
     @staticmethod
     def _run_update(function, *args):
@@ -368,8 +371,9 @@ class MTSBXML(xml_utils.XMLRecord):
         """
         self.metadata.dataqual.lineage.clear_children("procstep")
         for step in [k for k in config_object.keys() if "step" in k]:
-            index = int(step[-2:])
-            date = config_object[f"date_{index:02}"].replace("-", "")
+            step_count = int(step[-2:])
+            index = step_count + 1
+            date = config_object[f"date_{step_count:02}"].replace("-", "")
 
             xml_utils.XMLNode(
                 tag="procstep",
