@@ -14,7 +14,7 @@ Created on Tue Aug 29 16:38:28 2017
 """
 # ==============================================================================
 
-import os
+from pathlib import Path
 import time
 import datetime
 import sys
@@ -386,7 +386,7 @@ def summarize_log_files(station_dir):
     return summary_fn
 
 
-def write_shp_file(survey_csv_fn, save_path=None):
+def write_shp_file(survey_df=None, survey_csv_fn=None, save_path=None):
     """
         write a shape file with important information
 

@@ -503,13 +503,69 @@ class MTSBXML(xml_utils.XMLRecord):
         """
         
         for attr in self.metadata.eainfo.detailed.attr:
-            label = attr.attrlabl
+            label = attr.attrlabl.text
             try:
                 low = df[label].min()
                 high = df[label].max()
-                
-                attr.attrdomv.rdom.rdommin.text = str(low)
-                attr.attrdomv.rdom.rdommax.text = str(high)
+                try:
+                    attr.attrdomv.rdom.rdommin.text = str(low)
+                    attr.attrdomv.rdom.rdommax.text = str(high)
+                except AttributeError as error:
+                    # print(f"Attribute {label} does not have rdom, {error}")
+                    pass
                 
             except KeyError:
-                print(f"could not find {label} in dataframe, skipping")
+                # print(f"could not find {label} in dataframe, skipping")
+                pass
+            except TypeError as error:
+                # print(f"Could convert {label}, {error}")
+                pass
+
+
+    def update_with_station(self, station):
+        """
+        Update places where {STATION} is set as a place holder in the child
+        item.
+        
+        title, abstract, files names, 
+
+        Parameters
+        ----------
+        station : TYPE
+            DESCRIPTION.
+
+        Returns
+        -------
+        None.
+
+        """
+        
+        # add station name to title and abstract
+        self.metadata.idinfo.citation.citeinfo.title.text = self.metadata.idinfo.citation.citeinfo.title.text.replace("{STATION}", station)
+
+        self.metadata.idinfo.descript.abstract.text = self.metadata.idinfo.descript.abstract.text.replace(
+            "{STATION}", station
+        )
+
+        # add list of files
+        # add list of files
+        self.metadata.idinfo.descript.supplinf.text = self.metadata.idinfo.descript.supplinf.text.replace(
+            "{STATION_FILES}",
+            "\n\t\t\t".join(
+                [
+                    f"{station}.edi",
+                    f"{station}.png",
+                    f"{station}.name",
+                ]
+            ),
+        )
+
+        for ii in range(3):
+            self.metadata.eainfo.overview[ii].eaover.text = self.metadata.eainfo.overview[ii].eaover.text.replace(
+                "{STATION}", station
+            )
+            self.metadata.eainfo.overview[ii].eadetcit.text = self.metadata.eainfo.overview[ii].eadetcit.text.replace(
+                "{STATION}", station
+            )
+    
+        
