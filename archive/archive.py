@@ -162,8 +162,8 @@ class SBMTArcive:
         self.xml_dir = None
         self.cfg_dict = {}
 
-        self.logger = logging.getLogger(self.__class__.__name__)
-        self.setup_logger()
+        # self.logger = logging.getLogger(self.__class__.__name__)
+        # self.setup_logger()
 
         for k, v in kwargs.items():
             setattr(self, k, v)
@@ -204,26 +204,26 @@ class SBMTArcive:
                 value = Path(value)
         super().__setattr__(name, value)
 
-    def setup_logger(self):
-        self.logger.setLevel(logging.DEBUG)
-        self.logger.propagate = False
+    # def setup_logger(self):
+    #     self.logger.setLevel(logging.DEBUG)
+    #     self.logger.propagate = False
 
-        # stream_handler = logging.StreamHandler()
-        # stream_handler.setFormatter(LOG_FORMAT)
-        # stream_handler.setLevel(logging.WARNING)
-        # stream_handler.propagate = False
+    #     # stream_handler = logging.StreamHandler()
+    #     # stream_handler.setFormatter(LOG_FORMAT)
+    #     # stream_handler.setLevel(logging.WARNING)
+    #     # stream_handler.propagate = False
 
-        # self.logger.addHandler(stream_handler)
+    #     # self.logger.addHandler(stream_handler)
 
-    def setup_file_logger(self, station, save_dir):
-        logging_fn = save_dir.joinpath("sb_archiving.log")
-        file_handler = logging.FileHandler(filename=logging_fn,
-                                           mode="w")
-        file_handler.setFormatter(LOG_FORMAT)
-        file_handler.setLevel(logging.DEBUG)
-        file_handler.propagate = False
+    # def setup_file_logger(self, station, save_dir):
+    #     logging_fn = save_dir.joinpath("sb_archiving.log")
+    #     file_handler = logging.FileHandler(filename=logging_fn,
+    #                                        mode="w")
+    #     file_handler.setFormatter(LOG_FORMAT)
+    #     file_handler.setLevel(logging.DEBUG)
+    #     file_handler.propagate = False
 
-        self.logger.addHandler(file_handler)
+    #     self.logger.addHandler(file_handler)
 
     def read_cfg_file(self, fn):
         """
@@ -293,7 +293,8 @@ class SBMTArcive:
                     shutil.copy(self.edi_dir.joinpath(
                         f"{station}.edi"), edi_fn)
                 except Exception as error:
-                    self.logger.error(error)
+                    print(error)
+                    # self.logger.error(error)
 
     def copy_png_file(self, station, png_fn):
         """
@@ -335,13 +336,14 @@ class SBMTArcive:
         None.
 
         """
-        if not xml_fn.exist():
+        if not xml_fn.exists():
             if self.xml_dir:
                 try:
                     shutil.copy(self.xml_dir.joinpath(
                         f"{station}.xml"), xml_fn)
                 except Exception as error:
-                    self.logger.error(error)
+                    print(error)
+                    # self.logger.error(error)
 
     def copy_files_to_archive_dir(self, archive_dir, station):
         """
@@ -397,8 +399,7 @@ class SBMTArcive:
         if not save_station_dir.exists():
             save_station_dir.mkdir()
 
-        print(save_station_dir)
-        self.setup_file_logger(station, save_station_dir)
+        # self.setup_file_logger(station, save_station_dir)
 
         return station, save_station_dir
 
@@ -431,7 +432,7 @@ class SBMTArcive:
 
         station = run_df.station.unique()[0]
 
-        s_xml.update_with_station()
+        s_xml.update_with_station(station)
 
         # location
         if survey_df:
@@ -491,15 +492,15 @@ class SBMTArcive:
         try:
             fn_df = zc.get_z3d_df(calibration_path=self.calibration_dir)
         except ValueError as error:
-            msg = "folder %s because no Z3D files"
-            self.logger.error("folder %s because no Z3D files", station)
-            self.logger.error(str(error))
-            raise ArchiveError(msg % station)
+            msg = "folder %s because no Z3D files, %s"
+            # self.logger.error("folder %s because no Z3D files", station)
+            # self.logger.error(str(error))
+            raise ArchiveError(msg % (station, error))
 
-        self.logger.info("--- Creating MTH5 for %s ---", station)
+        # self.logger.info("--- Creating MTH5 for %s ---", station)
         # capture output to put into a log file
         station_st = datetime.datetime.now()
-        self.logger.info("Started %s at %s", station, station_st)
+        # self.logger.info("Started %s at %s", station, station_st)
 
         # Make MTH5 File
         m = MTH5(shuffle=self.mth5_shuffle,
@@ -510,14 +511,14 @@ class SBMTArcive:
         m.open_mth5(mth5_fn, "w")
         if not m.h5_is_write:
             msg = "Something went wrong with opening %, check logs"
-            self.logger.error(msg, mth5_fn)
+            # self.logger.error(msg, mth5_fn)
             raise ArchiveError(msg % mth5_fn)
 
         # loop over schedule blocks
         for run_num in fn_df.run.unique():
             run_df = fn_df.loc[fn_df.run == run_num]
             runts_obj, filters_list = zc.make_runts(run_df,
-                                                    self.logger,
+                                                    None,
                                                     self.cfg_dict)
             run_df.loc[:, ("end")] = pd.Timestamp(
                 runts_obj.run_metadata.time_period.end)
@@ -550,8 +551,9 @@ class SBMTArcive:
 
         station_et = datetime.datetime.now()
         t_diff = station_et - station_st
-        self.logger.info(
-            "Took --> {0:.2f} seconds".format(t_diff.total_seconds()))
+        print("Took --> {0:.2f} seconds".format(t_diff.total_seconds()))
+        # self.logger.info(
+        #     "Took --> {0:.2f} seconds".format(t_diff.total_seconds()))
 
         return run_df, mth5_fn
 
@@ -582,28 +584,70 @@ class SBMTArcive:
             )
         except Exception as error:
             msg = "Upload failed %s"
-            self.logger.error(msg, error)
+            # self.logger.error(msg, error)
             raise ArchiveError(msg % error)
 
-    def archive_stations(self, station_dir_list, make_xml=True,
+    def archive_stations(self, station_dir_list, summarize=True, make_xml=True,
                          copy_files=True, upload=False, page_id=None,
                          username=None, password=None,
                          file_types=[".zip", ".edi", ".png", ".xml", ".h5"],
                          **kwargs):
+        
+        if not self.survey_dir:
+            self.survey_dir = station_dir_list[0].parent
+            
+        if summarize:
+            survey_zc = z3d_collection.Z3DCollection(self.survey_dir)
+            survey_df = survey_zc.summarize_survey(calibration_path=self.calibration_dir)
 
         archive_dirs = []
         for station_dir in station_dir_list:
-            station_df, station_mth5_fn = self.make_station_mth5(station_dir,
-                                                                 **kwargs)
-            archive_station_dir = station_mth5_fn.parent
-            archive_dirs.append(archive_station_dir)
-            station = station_df.station.unique()[0]
-            if make_xml:
-                _ = self.make_child_xml(station_df,
-                                        archive_station_dir,
-                                        **kwargs)
-            if copy_files:
-                self.copy_files_to_archive_dir(archive_station_dir, station)
+            try:
+                station_df, station_mth5_fn = self.make_station_mth5(station_dir,
+                                                                     **kwargs)
+                archive_station_dir = station_mth5_fn.parent
+                archive_dirs.append(archive_station_dir)
+                station = station_df.station.unique()[0]
+                if summarize:
+                    survey_df.loc[survey_df.station==station, "end"] = station_df.end.max()
+                if make_xml:
+                    _ = self.make_child_xml(station_df,
+                                            archive_station_dir,
+                                            **kwargs)
+                if copy_files:
+                    self.copy_files_to_archive_dir(archive_station_dir, station)
+            except ArchiveError as error:
+                print("Skipping %s, %s" % (station_dir.name, error))
+                # self.logger.warning("Skipping %s, %s", station_dir.name, error)
+
+        if summarize:
+            ### write shape file
+            shp_df, shp_fn = survey_zc.write_shp_file(survey_df)
+        
+            ### write survey xml
+            # adjust survey information to align with data
+            survey_xml = mt_xml.MTSBXML()
+            if self.xml_root_template:
+                survey_xml.read_template_xml(self.xml_root_template)
+            if self.xml_cfg_fn:
+                survey_xml.update_from_config(self.xml_cfg_fn)
+        
+            # location
+            survey_xml.update_bounding_box(
+                survey_df.longitude.min(),
+                survey_df.longitude.max(),
+                survey_df.latitude.max(),
+                survey_df.latitude.min())
+        
+            # dates
+            survey_xml.update_time_period(survey_df.start.min().isoformat(), 
+                                          survey_df.end.max().isoformat())
+            
+            # shape file attributes limits
+            survey_xml.update_shp_attributes(shp_df)
+        
+            ### --> write survey xml file
+            survey_xml.save(self.archive_dir.joinpath("parent_page.xml"))
 
         if upload:
             if not page_id or not username or not password:
