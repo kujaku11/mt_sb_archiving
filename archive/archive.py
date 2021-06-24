@@ -219,7 +219,7 @@ class SBMTArcive:
 
         return station_dir_list
 
-    def copy_edi_file(self, station, edi_fn):
+    def copy_edi_file(self, edi_fn):
         """
 
 
@@ -238,12 +238,11 @@ class SBMTArcive:
         if not edi_fn.exists():
             if self.edi_dir:
                 try:
-                    shutil.copy(self.edi_dir.joinpath(f"{station}.edi"), edi_fn)
+                    shutil.copy(self.edi_dir.joinpath(f"{edi_fn.name}"), edi_fn)
                 except Exception as error:
-                    # print(error)
                     self.logger.error(error)
 
-    def copy_png_file(self, station, png_fn):
+    def copy_png_file(self, png_fn):
         """
 
 
@@ -262,11 +261,11 @@ class SBMTArcive:
         if not png_fn.exists():
             if self.png_dir:
                 try:
-                    shutil.copy(self.png_dir.joinpath(f"{station}.png"), png_fn)
+                    shutil.copy(self.png_dir.joinpath(f"{png_fn.name}"), png_fn)
                 except Exception as error:
                     self.logger.error(error)
 
-    def copy_xml_file(self, station, xml_fn):
+    def copy_xml_file(self, xml_fn):
         """
 
 
@@ -285,7 +284,7 @@ class SBMTArcive:
         if not xml_fn.exists():
             if self.xml_dir:
                 try:
-                    shutil.copy(self.xml_dir.joinpath(f"{station}.xml"), xml_fn)
+                    shutil.copy(self.xml_dir.joinpath(f"{xml_fn.name}"), xml_fn)
                 except Exception as error:
                     # print(error)
                     self.logger.error(error)
@@ -399,7 +398,7 @@ class SBMTArcive:
         s_xml.update_time_period(
             run_df.start.min().isoformat(), run_df.end.max().isoformat()
         )
-        
+
         s_xml.update_metadate()
 
         # write station xml
@@ -499,7 +498,9 @@ class SBMTArcive:
         run_df.to_csv(save_station_dir.joinpath(f"{station}_summary.csv"), index=False)
         # update survey metadata from data and cfg file
         try:
-            m.survey_group.update_survey_metadata(survey_dict=self.mth5_cfg_dict["survey"])
+            m.survey_group.update_survey_metadata(
+                survey_dict=self.mth5_cfg_dict["survey"]
+            )
         except KeyError:
             m.survey_group.update_survey_metadata()
 
@@ -508,7 +509,9 @@ class SBMTArcive:
         station_et = datetime.datetime.now()
         t_diff = (station_et - station_st).total_seconds()
         print(f"Processing Took: {t_diff // 60:0.0f}:{t_diff%60:04.1f} minutes")
-        self.logger.info(f"Processing Took: {t_diff // 60:0.0f}:{t_diff%60:04.1f} minutes")
+        self.logger.info(
+            f"Processing Took: {t_diff // 60:0.0f}:{t_diff%60:04.1f} minutes"
+        )
 
         return run_df, mth5_fn
 
@@ -569,7 +572,7 @@ class SBMTArcive:
                 self.survey_df = pd.read_csv(self.survey_csv_fn)
                 self.survey_df.start = pd.to_datetime(self.survey_df.start)
                 self.survey_df.end = pd.to_datetime(self.survey_df.end)
-                
+
         archive_dirs = []
         for station_dir in station_dir_list:
             try:
@@ -584,10 +587,12 @@ class SBMTArcive:
                         self.survey_df.station == station, ("end")
                     ] = pd.Timestamp(station_df.end.max())
                 if make_xml:
-                    _ = self.make_child_xml(station_df, 
-                                            save_station_dir=archive_station_dir,
-                                            survey_df=self.survey_df,
-                                            **kwargs)
+                    _ = self.make_child_xml(
+                        station_df,
+                        save_station_dir=archive_station_dir,
+                        survey_df=self.survey_df,
+                        **kwargs,
+                    )
                 if copy_files:
                     self.copy_files_to_archive_dir(archive_station_dir, station)
                 print("\a")
@@ -625,7 +630,7 @@ class SBMTArcive:
             self.survey_df.end = pd.to_datetime(self.survey_df.end)
             survey_xml.update_time_period(
                 self.survey_df.start.min().isoformat(),
-                self.survey_df.end.max().isoformat()
+                self.survey_df.end.max().isoformat(),
             )
 
             # shape file attributes limits
