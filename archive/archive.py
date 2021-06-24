@@ -305,13 +305,13 @@ class SBMTArcive:
         """
 
         edi_fn = archive_dir.joinpath(f"{station}.edi")
-        self.copy_edi_file(station, edi_fn)
+        self.copy_edi_file(edi_fn)
 
         png_fn = archive_dir.joinpath(f"{station}.png")
-        self.copy_png_file(station, png_fn)
+        self.copy_png_file(png_fn)
 
         xml_fn = archive_dir.joinpath(f"{station}.xml")
-        self.copy_xml_file(station, xml_fn)
+        self.copy_xml_file(xml_fn)
 
     def setup_station_archive_dir(self, station_dir):
         """
@@ -429,18 +429,17 @@ class SBMTArcive:
         for k, v in kwargs.items():
             setattr(self, k, v)
 
-        station_dir = Path(station_dir)
-        station, save_station_dir = self.setup_station_archive_dir(station_dir)
-
         # get the file names for each block of z3d files if none skip
         zc = z3d_collection.Z3DCollection(station_dir)
         try:
             fn_df = zc.get_z3d_df(calibration_path=self.calibration_dir)
+            station_dir = Path(station_dir)
+            station, save_station_dir = self.setup_station_archive_dir(station_dir)
         except ValueError as error:
             msg = "folder %s because no Z3D files, %s"
-            self.logger.error("folder %s because no Z3D files", station)
+            self.logger.error("folder %s because no Z3D files", station_dir)
             self.logger.error(str(error))
-            raise ArchiveError(msg % (station, error))
+            raise ArchiveError(msg % (station_dir, error))
 
         self.logger.info("--- Creating MTH5 for %s ---", station)
         # capture output to put into a log file
@@ -466,7 +465,7 @@ class SBMTArcive:
             run_df = fn_df.loc[fn_df.run == run_num]
             runts_obj, filters_list = zc.make_runts(
                 run_df,
-                logger_file_handler=self.logger.handlers[1],
+                logger_file_handler=self.logger.handlers[-1],
                 config_dict=self.mth5_cfg_dict,
                 survey_csv_fn=self.survey_csv_fn,
             )
