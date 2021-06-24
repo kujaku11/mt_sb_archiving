@@ -217,7 +217,7 @@ class SBMTArcive:
 
         return station_dir_list
 
-    def copy_edi_file(self, station, edi_fn):
+    def copy_edi_file(self, edi_fn):
         """
 
 
@@ -236,12 +236,11 @@ class SBMTArcive:
         if not edi_fn.exists():
             if self.edi_dir:
                 try:
-                    shutil.copy(self.edi_dir.joinpath(f"{station}.edi"), edi_fn)
+                    shutil.copy(self.edi_dir.joinpath(f"{edi_fn.name}"), edi_fn)
                 except Exception as error:
-                    # print(error)
                     self.logger.error(error)
 
-    def copy_png_file(self, station, png_fn):
+    def copy_png_file(self, png_fn):
         """
 
 
@@ -260,11 +259,11 @@ class SBMTArcive:
         if not png_fn.exists():
             if self.png_dir:
                 try:
-                    shutil.copy(self.png_dir.joinpath(f"{station}.png"), png_fn)
+                    shutil.copy(self.png_dir.joinpath(f"{png_fn.name}"), png_fn)
                 except Exception as error:
                     self.logger.error(error)
 
-    def copy_xml_file(self, station, xml_fn):
+    def copy_xml_file(self, xml_fn):
         """
 
 
@@ -283,7 +282,7 @@ class SBMTArcive:
         if not xml_fn.exists():
             if self.xml_dir:
                 try:
-                    shutil.copy(self.xml_dir.joinpath(f"{station}.xml"), xml_fn)
+                    shutil.copy(self.xml_dir.joinpath(f"{xml_fn.name}"), xml_fn)
                 except Exception as error:
                     # print(error)
                     self.logger.error(error)
