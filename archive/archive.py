@@ -396,7 +396,7 @@ class SBMTArcive:
         s_xml.update_time_period(
             run_df.start.min().isoformat(), run_df.end.max().isoformat()
         )
-        
+
         s_xml.update_metadate()
 
         # write station xml
@@ -495,7 +495,9 @@ class SBMTArcive:
         run_df.to_csv(save_station_dir.joinpath(f"{station}_summary.csv"), index=False)
         # update survey metadata from data and cfg file
         try:
-            m.survey_group.update_survey_metadata(survey_dict=self.mth5_cfg_dict["survey"])
+            m.survey_group.update_survey_metadata(
+                survey_dict=self.mth5_cfg_dict["survey"]
+            )
         except KeyError:
             m.survey_group.update_survey_metadata()
 
@@ -504,7 +506,9 @@ class SBMTArcive:
         station_et = datetime.datetime.now()
         t_diff = (station_et - station_st).total_seconds()
         print(f"Processing Took: {t_diff // 60:0.0f}:{t_diff%60:04.1f} minutes")
-        self.logger.info(f"Processing Took: {t_diff // 60:0.0f}:{t_diff%60:04.1f} minutes")
+        self.logger.info(
+            f"Processing Took: {t_diff // 60:0.0f}:{t_diff%60:04.1f} minutes"
+        )
 
         return run_df, mth5_fn
 
@@ -565,7 +569,7 @@ class SBMTArcive:
                 self.survey_df = pd.read_csv(self.survey_csv_fn)
                 self.survey_df.start = pd.to_datetime(self.survey_df.start)
                 self.survey_df.end = pd.to_datetime(self.survey_df.end)
-                
+
         archive_dirs = []
         for station_dir in station_dir_list:
             try:
@@ -580,10 +584,12 @@ class SBMTArcive:
                         self.survey_df.station == station, ("end")
                     ] = pd.Timestamp(station_df.end.max())
                 if make_xml:
-                    _ = self.make_child_xml(station_df, 
-                                            save_station_dir=archive_station_dir,
-                                            survey_df=self.survey_df,
-                                            **kwargs)
+                    _ = self.make_child_xml(
+                        station_df,
+                        save_station_dir=archive_station_dir,
+                        survey_df=self.survey_df,
+                        **kwargs,
+                    )
                 if copy_files:
                     self.copy_files_to_archive_dir(archive_station_dir, station)
                 print("\a")
@@ -614,7 +620,7 @@ class SBMTArcive:
             # dates
             survey_xml.update_time_period(
                 self.survey_df.start.min().isoformat(),
-                self.survey_df.end.max().isoformat()
+                self.survey_df.end.max().isoformat(),
             )
 
             # shape file attributes limits

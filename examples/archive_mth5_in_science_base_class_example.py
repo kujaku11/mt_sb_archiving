@@ -25,20 +25,20 @@ sbmt = archive.SBMTArcive()
 sbmt.survey_dir = Path(r"c:\Users\jpeacock\Documents\test_data")
 
 # MTH5 compression
-sbmt.mth5_compression = "gzip" # [ gzip | lfx | szip ]
-sbmt.mth5_compression_level = 5 # [0-9]
-sbmt.mth5_chunks = True # [True | chunck size number ]
-sbmt.mth5_shuffle = True # [ True | False]
-sbmt.mth5_fletcher = True # [ True | False ]
+sbmt.mth5_compression = "gzip"  # [ gzip | lfx | szip ]
+sbmt.mth5_compression_level = 5  # [0-9]
+sbmt.mth5_chunks = True  # [True | chunck size number ]
+sbmt.mth5_shuffle = True  # [ True | False]
+sbmt.mth5_fletcher = True  # [ True | False ]
 
-sbmt.survey_csv_fn = Path(r"c:\Users\jpeacock\Documents\test_data\Archive\survey_summary.csv")
+sbmt.survey_csv_fn = Path(
+    r"c:\Users\jpeacock\Documents\test_data\Archive\survey_summary.csv"
+)
 
 # path to mth5 configuration file
 # this is a configuration file that has metadata explaining most of the
 # common information needed by the user.  See example files
-sbmt.mth5_cfg_fn = Path(
-    r"c:\Users\jpeacock\Documents\test_data\gv_mth5_config.cfg"
-)
+sbmt.mth5_cfg_fn = Path(r"c:\Users\jpeacock\Documents\test_data\gv_mth5_config.cfg")
 if sbmt.mth5_cfg_fn is not None:
     sbmt.mth5_cfg_dict = sbmt.read_cfg_file(sbmt.mth5_cfg_fn)
 
