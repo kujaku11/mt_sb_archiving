@@ -307,13 +307,13 @@ class SBMTArcive:
         """
 
         edi_fn = archive_dir.joinpath(f"{station}.edi")
-        self.copy_edi_file(station, edi_fn)
+        self.copy_edi_file(edi_fn)
 
         png_fn = archive_dir.joinpath(f"{station}.png")
-        self.copy_png_file(station, png_fn)
+        self.copy_png_file(png_fn)
 
         xml_fn = archive_dir.joinpath(f"{station}.xml")
-        self.copy_xml_file(station, xml_fn)
+        self.copy_xml_file(xml_fn)
 
     def setup_station_archive_dir(self, station_dir):
         """
@@ -459,6 +459,7 @@ class SBMTArcive:
         )
         mth5_fn = save_station_dir.joinpath(f"{station}.h5")
         m.open_mth5(mth5_fn, "w")
+        print(m.dataset_options)
         if not m.h5_is_write:
             msg = "Something went wrong with opening %, check logs"
             self.logger.error(msg, mth5_fn)
