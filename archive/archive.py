@@ -163,6 +163,8 @@ class SBMTArcive:
         # self.logger.addHandler(stream_handler)
 
     def setup_file_logger(self, station, save_dir):
+        if self.logger.hasHandlers():
+            self.logger.handlers.clear()
         logging_fn = save_dir.joinpath("sb_archiving.log")
         file_handler = logging.FileHandler(filename=logging_fn, mode="w")
         file_handler.setFormatter(LOG_FORMAT)
@@ -431,12 +433,13 @@ class SBMTArcive:
             setattr(self, k, v)
 
         station_dir = Path(station_dir)
-        station, save_station_dir = self.setup_station_archive_dir(station_dir)
+        
 
         # get the file names for each block of z3d files if none skip
         zc = z3d_collection.Z3DCollection(station_dir)
         try:
             fn_df = zc.get_z3d_df(calibration_path=self.calibration_dir)
+            station, save_station_dir = self.setup_station_archive_dir(station_dir)
         except ValueError as error:
             msg = "folder %s because no Z3D files, %s"
             self.logger.error("folder %s because no Z3D files", station)
@@ -467,7 +470,7 @@ class SBMTArcive:
             run_df = fn_df.loc[fn_df.run == run_num]
             runts_obj, filters_list = zc.make_runts(
                 run_df,
-                logger_file_handler=self.logger.handlers[1],
+                logger_file_handler=self.logger.handlers[-1],
                 config_dict=self.mth5_cfg_dict,
                 survey_csv_fn=self.survey_csv_fn,
             )
@@ -593,6 +596,11 @@ class SBMTArcive:
                 self.logger.warning("Skipping %s, %s", station_dir.name, error)
 
         if summarize:
+            # write csv
+            self.survey_df.to_csv(
+                self.archive_dir.joinpath("survey_summary.csv"), index=False
+            )
+            
             ### write shape file
             shp_df, shp_fn = survey_zc.write_shp_file(self.survey_df)
 
@@ -613,6 +621,8 @@ class SBMTArcive:
             )
 
             # dates
+            self.survey_df.start = pd.to_datetime(self.survey_df.start)
+            self.survey_df.end = pd.to_datetime(self.survey_df.end)
             survey_xml.update_time_period(
                 self.survey_df.start.min().isoformat(),
                 self.survey_df.end.max().isoformat()
