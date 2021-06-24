@@ -433,7 +433,6 @@ class SBMTArcive:
 
         station_dir = Path(station_dir)
         
-
         # get the file names for each block of z3d files if none skip
         zc = z3d_collection.Z3DCollection(station_dir)
         try:
@@ -441,9 +440,9 @@ class SBMTArcive:
             station, save_station_dir = self.setup_station_archive_dir(station_dir)
         except ValueError as error:
             msg = "folder %s because no Z3D files, %s"
-            self.logger.error("folder %s because no Z3D files", station)
+            self.logger.error("folder %s because no Z3D files", station_dir)
             self.logger.error(str(error))
-            raise ArchiveError(msg % (station, error))
+            raise ArchiveError(msg % (station_dir, error))
 
         self.logger.info("--- Creating MTH5 for %s ---", station)
         # capture output to put into a log file
