@@ -31,11 +31,10 @@ sbmt.mth5_chunks = True  # [True | chunck size number ]
 sbmt.mth5_shuffle = True  # [ True | False]
 sbmt.mth5_fletcher = True  # [ True | False ]
 
-sbmt.survey_csv_fn = Path(
-    r"c:\Users\jpeacock\Documents\test_data\Archive\survey_summary.csv"
-)
-
+# sbmt.survey_csv_fn = Path(
+#     r"c:\Users\jpeacock\Documents\test_data\survey_summary.csv"
 # )
+sbmt.survey_csv_fn = None
 # path to mth5 configuration file
 # this is a configuration file that has metadata explaining most of the
 # common information needed by the user.  See example files
