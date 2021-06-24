@@ -31,15 +31,16 @@ sbmt.mth5_chunks = True # [True | chunck size number ]
 sbmt.mth5_shuffle = True # [ True | False]
 sbmt.mth5_fletcher = True # [ True | False ]
 
-sbmt.csv_fn = Path(r"c:\Users\jpeacock\Documents\test_data\Archive\survey_summary.csv")
+sbmt.survey_csv_fn = Path(r"c:\Users\jpeacock\Documents\test_data\Archive\survey_summary.csv")
 
 # path to mth5 configuration file
 # this is a configuration file that has metadata explaining most of the
 # common information needed by the user.  See example files
-sbmt.cfg_fn = Path(
+sbmt.mth5_cfg_fn = Path(
     r"c:\Users\jpeacock\Documents\test_data\gv_mth5_config.cfg"
 )
-sbmt.cfg_dict = sbmt.read_cfg_file(sbmt.cfg_fn)
+if sbmt.mth5_cfg_fn is not None:
+    sbmt.mth5_cfg_dict = sbmt.read_cfg_file(sbmt.mth5_cfg_fn)
 
 # path to xml configuration file
 # this is a file that has metadata common to the xml files that go into
@@ -85,7 +86,7 @@ sbmt.archive_stations(
     station_dirs,
     make_xml=True,
     copy_files=True,
-    summarize=False,
+    summarize=True,
     upload=False,
     page_id=None,
     username=None,

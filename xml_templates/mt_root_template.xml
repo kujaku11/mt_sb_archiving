@@ -134,14 +134,21 @@
     </posacc>
     <lineage>
       <procstep>
-        <procdesc>describe processing step 1.
+        <procdesc>Time-series electric and magnetic field data were collected in a geomagnetic north and east coordinate system using wideband magnetotelluric instrumentation at each site location. These data are provided in HDf5 format (*.mth5 files) for all 2018 and 2019 stations and in zipped ascii format (*.asc files) for all 2015 data. More information about instrumentation and file formats can be found in the PDF Guide_to_MT_Data_types, available at https://doi.org/10.5066/F7610XTR.
 		</procdesc>
-        <procdate>processing date</procdate>
+        <procdate>20190829</procdate>
       </procstep>
-	  <procstep>
-        <procdesc>describe processing step n.
-		</procdesc>
-        <procdate>processing date</procdate>
+      <procstep>
+        <procdesc>Fourier spectra were calculated from windowed time-series data and used to calculate cross- and auto-power spectra. Remote reference processing, in which synchronously recording stations are processed together to remove incoherent noise, was carried out using all possible station combinations. Impedance and tipper transfer functions were calculated at each station. System and sensor responses were accounted for during this process and transfer function estimates were made for particular frequency bandwidths for each data run. Processing software used can be found in the *.edi and file header information. These files are described in detail within the PDF Guide_to_MT_Data_Types, available at https://doi.org/10.5066/F7610XTR. </procdesc>
+        <procdate>20200101</procdate>
+      </procstep>
+      <procstep>
+        <procdesc>Transfer function estimates were constructed by selecting optimal transfer function estimates at each period from a series of processing runs using different reference combinations. High and low sampling rate wideband recordings provided transfer function estimates for 1000-1 Hz and 0.001-1 Hz, respectively. So-called optimal transfer functions were selected based on examination of phase slope, smooth curve assumptions, and operator discretion. Transfer function estimates provided in the *.edi files and displayed in the *.png files have been rotated to geographic coordinates (X = North). Additional metadata information can be found in the *.edi file headers as well as the provided *mth5 files. Descriptions of these metadata can be found in the PDF Guide_to_MT_Data_Types, available at https://doi.org/10.5066/F7610XTR.</procdesc>
+        <procdate>20200310</procdate>
+      </procstep>
+      <procstep>
+      	<procdesc>The shapefile MIWIMN_EUP_NMN_PEN_WUP.shp was created using a suite of scripts written in Python. These scripts parse through the metadata for each station, and write the data to a shapefile table. Elevations are retrieved from The National Map, Bulk Point Query Service. See attached PDF Guide_to_MT_Data_types, available at https://doi.org/10.5066/F7610XTR, for more information about specific metadata files.</procdesc>
+      	<procdate>20201030</procdate>
       </procstep>
     </lineage>
   </dataqual>

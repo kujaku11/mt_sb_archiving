@@ -65,7 +65,7 @@ import pandas as pd
 # =============================================================================
 # Global Variables
 # =============================================================================
-fgdc_dir = Path(__file__).parent.parent.joinpath("fgdc_standards")
+fgdc_dir = Path(__file__).parent.parent.parent.joinpath("fgdc_standards")
 FGDC_XSD_NAME = fgdc_dir.joinpath("fgdc-std-001-1998-annotated.xsd")
 BDP_LOOKUP = fgdc_dir.joinpath("bdp_lookup.json")
 

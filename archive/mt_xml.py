@@ -75,6 +75,8 @@ class MTSBXML(xml_utils.XMLRecord):
         self._run_update(self._update_processing, c["processing"])
         if not child:
             self._run_update(self._update_attachments, c["attachments"])
+            
+        self._run_update(self.update_metadate)
 
     @staticmethod
     def _run_update(function, *args):
@@ -580,3 +582,24 @@ class MTSBXML(xml_utils.XMLRecord):
             ].eadetcit.text = self.metadata.eainfo.overview[ii].eadetcit.text.replace(
                 "{STATION}", station
             )
+                
+    def update_metadate(self):
+        """
+        Update metadate
+
+        Parameters
+        ----------
+        mdate : TYPE
+            DESCRIPTION.
+
+        Returns
+        -------
+        None.
+
+        """
+        now = datetime.datetime.utcnow()
+        now_str = now.strftime("%Y%m%d")
+        
+        self.metadata.metainfo.metd.text = now_str
+                    
+        

@@ -86,6 +86,7 @@ class SBMTArcive:
     def __init__(self, **kwargs):
         self.survey_dir = None
         self.archive_dir = None
+        self.survey_df = None
 
         # compression for the h5 file
         self.mth5_compression = None
@@ -95,8 +96,8 @@ class SBMTArcive:
         self.mth5_fletcher = None
 
         # conifiguration files
-        self.csv_fn = None
-        self.cfg_fn = None
+        self.survey_csv_fn = None
+        self.mth5_cfg_fn = None
         self.xml_cfg_fn = None
 
         # Science Base XML files
@@ -106,7 +107,7 @@ class SBMTArcive:
         self.edi_dir = None
         self.png_dir = None
         self.xml_dir = None
-        self.cfg_dict = {}
+        self.mth5_cfg_dict = {}
 
         self.logger = logging.getLogger(self.__class__.__name__)
         self.setup_logger()
@@ -114,8 +115,8 @@ class SBMTArcive:
         for k, v in kwargs.items():
             setattr(self, k, v)
 
-        if self.cfg_fn:
-            self.cfg_dict = self.read_cfg_file(self.cfg_fn)
+        if self.mth5_cfg_fn:
+            self.mth5_cfg_dict = self.read_cfg_file(self.mth5_cfg_fn)
 
     def __str__(self):
         """overwrite the string representation"""
@@ -370,14 +371,14 @@ class SBMTArcive:
         if self.xml_child_template:
             s_xml.read_template_xml(self.xml_child_template)
         if self.xml_cfg_fn:
-            s_xml.update_from_config(self.xml_cfg_fn)
+            s_xml.update_from_config(self.xml_cfg_fn, child=True)
 
         station = run_df.station.unique()[0]
 
         s_xml.update_with_station(station)
 
         # location
-        if survey_df:
+        if survey_df is not None:
             s_xml.update_bounding_box(
                 survey_df.longitude.max(),
                 survey_df.longitude.min(),
@@ -396,6 +397,8 @@ class SBMTArcive:
         s_xml.update_time_period(
             run_df.start.min().isoformat(), run_df.end.max().isoformat()
         )
+        
+        s_xml.update_metadate()
 
         # write station xml
         xml_fn = save_station_dir.joinpath(f"{station}.xml")
@@ -465,8 +468,8 @@ class SBMTArcive:
             runts_obj, filters_list = zc.make_runts(
                 run_df,
                 logger_file_handler=self.logger.handlers[1],
-                config_dict=self.cfg_dict,
-                survey_csv_fn=self.csv_fn,
+                config_dict=self.mth5_cfg_dict,
+                survey_csv_fn=self.survey_csv_fn,
             )
             run_df.loc[:, ("end")] = pd.Timestamp(
                 runts_obj.run_metadata.time_period.end
@@ -493,16 +496,16 @@ class SBMTArcive:
         run_df.to_csv(save_station_dir.joinpath(f"{station}_summary.csv"), index=False)
         # update survey metadata from data and cfg file
         try:
-            m.survey_group.update_survey_metadata(survey_dict=self.cfg_dict["survey"])
+            m.survey_group.update_survey_metadata(survey_dict=self.mth5_cfg_dict["survey"])
         except KeyError:
             m.survey_group.update_survey_metadata()
 
         m.close_mth5()
 
         station_et = datetime.datetime.now()
-        t_diff = station_et - station_st
-        print("Took --> {0:.2f} seconds".format(t_diff.total_seconds()))
-        self.logger.info("Took --> {0:.2f} seconds".format(t_diff.total_seconds()))
+        t_diff = (station_et - station_st).total_seconds()
+        print(f"Processing Took: {t_diff // 60:0.0f}:{t_diff%60:04.1f} minutes")
+        self.logger.info(f"Processing Took: {t_diff // 60:0.0f}:{t_diff%60:04.1f} minutes")
 
         return run_df, mth5_fn
 
@@ -553,13 +556,17 @@ class SBMTArcive:
         if not self.survey_dir:
             self.survey_dir = station_dir_list[0].parent
 
-        survey_df = None
         if summarize:
             survey_zc = z3d_collection.Z3DCollection(self.survey_dir)
-            survey_df = survey_zc.summarize_survey(
-                calibration_path=self.calibration_dir
-            )
-
+            if self.survey_csv_fn is None:
+                self.survey_df = survey_zc.summarize_survey(
+                    calibration_path=self.calibration_dir
+                )
+            else:
+                self.survey_df = pd.read_csv(self.survey_csv_fn)
+                self.survey_df.start = pd.to_datetime(self.survey_df.start)
+                self.survey_df.end = pd.to_datetime(self.survey_df.end)
+                
         archive_dirs = []
         for station_dir in station_dir_list:
             try:
@@ -569,14 +576,14 @@ class SBMTArcive:
                 archive_station_dir = station_mth5_fn.parent
                 archive_dirs.append(archive_station_dir)
                 station = station_df.station.unique()[0]
-                if summarize:
-                    survey_df.loc[
-                        survey_df.station == station, "end"
-                    ] = station_df.end.max()
+                if self.survey_df is not None:
+                    self.survey_df.loc[
+                        self.survey_df.station == station, ("end")
+                    ] = pd.Timestamp(station_df.end.max())
                 if make_xml:
                     _ = self.make_child_xml(station_df, 
                                             save_station_dir=archive_station_dir,
-                                            survey_df=survey_df,
+                                            survey_df=self.survey_df,
                                             **kwargs)
                 if copy_files:
                     self.copy_files_to_archive_dir(archive_station_dir, station)
@@ -587,7 +594,7 @@ class SBMTArcive:
 
         if summarize:
             ### write shape file
-            shp_df, shp_fn = survey_zc.write_shp_file(survey_df)
+            shp_df, shp_fn = survey_zc.write_shp_file(self.survey_df)
 
             ### write survey xml
             # adjust survey information to align with data
@@ -599,15 +606,16 @@ class SBMTArcive:
 
             # location
             survey_xml.update_bounding_box(
-                survey_df.longitude.min(),
-                survey_df.longitude.max(),
-                survey_df.latitude.max(),
-                survey_df.latitude.min(),
+                self.survey_df.longitude.min(),
+                self.survey_df.longitude.max(),
+                self.survey_df.latitude.max(),
+                self.survey_df.latitude.min(),
             )
 
             # dates
             survey_xml.update_time_period(
-                survey_df.start.min().isoformat(), survey_df.end.max().isoformat()
+                self.survey_df.start.min().isoformat(),
+                self.survey_df.end.max().isoformat()
             )
 
             # shape file attributes limits
@@ -616,7 +624,7 @@ class SBMTArcive:
             ### --> write survey xml file
             survey_xml.save(self.archive_dir.joinpath("parent_page.xml"))
 
-            survey_df.to_csv(
+            self.survey_df.to_csv(
                 self.archive_dir.joinpath("survey_summary.csv"), index=False
             )
 
