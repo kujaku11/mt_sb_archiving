@@ -649,3 +649,38 @@ class SBMTArcive:
 
             for archive_station_dir in archive_dirs:
                 self.upload_data(page_id, archive_station_dir, username, file_types)
+
+
+    def upload_stations(self, page_id, archive_dir, username, password, 
+                        file_types=[".zip", ".edi", ".png", ".xml", ".h5"]):
+        """
+        Upload stations to Science Base
+        
+        :param page_id: DESCRIPTION
+        :type page_id: TYPE
+        :param archive_dir: DESCRIPTION
+        :type archive_dir: TYPE
+        :param username: DESCRIPTION
+        :type username: TYPE
+        :param password: DESCRIPTION
+        :type password: TYPE
+        :param file_types: DESCRIPTION, defaults to [".zip", ".edi", ".png", ".xml", ".h5"]
+        :type file_types: TYPE, optional
+        :return: DESCRIPTION
+        :rtype: TYPE
+
+        """
+
+        if isinstance(archive_dir, list):
+            archive_dirs = archive_dir
+        elif isinstance(archive_dir, (Path, str)):
+            archive_dirs = [p for p in Path(archive_dir).iterdir() if p.is_dir()]
+            
+        for archive_station_dir in archive_dirs:
+            try:
+                self.upload_data(page_id, archive_station_dir, username, file_types)
+                print("\a")
+            except ArchiveError as error:
+                print("Could not archive %s" % error)
+                self.logger.warning("Could not archive %s", error)
+                
