@@ -11,6 +11,7 @@ Created on Thu Jun 17 09:46:42 2021
 from pathlib import Path
 import time
 import sciencebasepy as sb
+from archive.mt_xml import MTSBXML
 
 import urllib as url
 import xml.etree.ElementTree as ET
@@ -114,7 +115,7 @@ def sb_session_login(sb_session, sb_username, sb_password=None):
     return sb_session
 
 
-def sb_get_fn_list(archive_dir, f_types=["zip", "edi", "png", "xml", "h5"]):
+def sb_get_fn_list(archive_dir, f_types=[".zip", ".edi", ".png", ".xml", ".h5"]):
     """
     Get the list of files to archive looking for .zip, .edi, .png within the
     archive directory.  Sorts in the order of xml, edi, png, zip
@@ -126,9 +127,9 @@ def sb_get_fn_list(archive_dir, f_types=["zip", "edi", "png", "xml", "h5"]):
 
     """
     fn_list = []
+    fn_path = Path(archive_dir)
     for f_type in f_types:
-        fn_path = Path(archive_dir)
-        fn_list += fn_path.glob(f"*.{f_type}")
+        fn_list += [fn.as_posix() for fn in fn_path.glob(f"*{f_type}")]
 
     return sb_sort_fn_list(fn_list)
 
@@ -139,7 +140,7 @@ def sb_upload_data(
     sb_username,
     sb_password=None,
     f_types=[".zip", ".edi", ".png", ".xml", ".mth5"],
-    child_xml=None,
+    child_xml=False,
 ):
     """
     Upload a given archive station directory to a new child item of the given
@@ -178,12 +179,12 @@ def sb_upload_data(
     ### be visible, otherwise run from a command line > python sciencebase_upload.py
     sb_session_login(session, sb_username, sb_password)
     archive_station_dir = Path(archive_station_dir)
-    station = archive_station_dir.parent
+    station = archive_station_dir.name
+    print(station, archive_station_dir)
 
-    ### File to upload
-    if child_xml:
-        f_types.remove(".xml")
+    ### Files to upload
     upload_fn_list = sb_get_fn_list(archive_station_dir, f_types=f_types)
+    print(upload_fn_list)
 
     ### check if child item is already created
     child_id = sb_locate_child_item(session, station, sb_page_id)
@@ -204,10 +205,15 @@ def sb_upload_data(
     new_child = session.create_item(new_child_dict)
 
     if child_xml:
-        child_xml.update_child(new_child)
-        child_xml.save(archive_station_dir.joinpath(f"{station}.xml"))
-        upload_fn_list.append(child_xml.fn.as_posix())
-
+        try:
+            c_xml_fn = [fn for fn in upload_fn_list if fn.endswith(".xml")][0]
+            c_xml = MTSBXML(c_xml_fn)
+            c_xml.update_child(new_child)
+            c_xml.save(archive_station_dir.joinpath(f"{station}.xml"))
+            print(f"updated XML {c_xml_fn} to {c_xml.fn}")
+        except IndexError:
+            print(f"No Child XML found for {station}")
+            
     # sort list so that xml, edi, png, zip files
     # upload data
     try:

@@ -538,7 +538,12 @@ class SBMTArcive:
 
         try:
             sb_tools.sb_upload_data(
-                page_id, station_dir, username, password, f_types=file_types
+                page_id, 
+                station_dir,
+                username, 
+                password, 
+                f_types=file_types,
+                child_xml=True,
             )
         except Exception as error:
             msg = "Upload failed %s"
@@ -677,9 +682,15 @@ class SBMTArcive:
             archive_dirs = [p for p in Path(archive_dir).iterdir() if p.is_dir()]
             
         for archive_station_dir in archive_dirs:
+            print(f"Archiving: {archive_station_dir}")
             try:
-                self.upload_data(page_id, archive_station_dir, username, file_types)
+                self.upload_data(page_id, 
+                                 archive_station_dir,
+                                 username,
+                                 password,
+                                 file_types)
                 print("\a")
+                print(f"Uploaded {archive_station_dir.name}")
             except ArchiveError as error:
                 print("Could not archive %s" % error)
                 self.logger.warning("Could not archive %s", error)
