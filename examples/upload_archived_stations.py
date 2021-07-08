@@ -24,7 +24,7 @@ password = getpass.getpass()
 
 archive_dirs = [p for p in Path(archive_dir).iterdir() if p.is_dir()]
 
-for archive_station_dir in archive_dirs[28:]:
+for archive_station_dir in archive_dirs[50:51]:
     st = mttime.MTime(mttime.get_now_utc())
     print(f"Archiving: {archive_station_dir}")
     try:

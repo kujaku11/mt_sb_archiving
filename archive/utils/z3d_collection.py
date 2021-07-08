@@ -474,6 +474,11 @@ class Z3DCollection(object):
                 h_df = station_df.loc[station_df.component == hc]
                 if len(h_df) == 0:
                     print(f"WARNING: No {hc} information for {station}")
+                    entry[f"{hc}_sensor"] = 0
+                    entry[f"{hc}_azimuth"] = 0
+                    entry[f"{hc}_ch_num"] = 0
+                    entry[f"{hc}_cal_fn"] = 0
+                    continue
                 entry[f"{hc}_sensor"] = h_df.coil_number.median()
                 entry[f"{hc}_azimuth"] = h_df.azimuth.median()
                 entry[f"{hc}_ch_num"] = h_df.channel_number.median()
