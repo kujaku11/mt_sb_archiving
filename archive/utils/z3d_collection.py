@@ -30,6 +30,7 @@ from mth5.io import zen
 from mth5.timeseries import RunTS
 
 from mt_metadata.timeseries.filters import FrequencyResponseTableFilter
+from mt_metadata.utils.mttime import MTTimeError
 
 # =============================================================================
 class Z3DCollectionError(Exception):
@@ -304,28 +305,35 @@ class Z3DCollection(object):
         z3d_info_list = []
         for z3d_fn in z3d_fn_list:
             z3d_obj = zen.Z3D(z3d_fn)
-            z3d_obj.read_all_info()
-            # z3d_obj.start = z3d_obj.zen_schedule.isoformat()
-            # set some attributes to null to fill later
-            z3d_obj.n_samples = 0
-            z3d_obj.block = 0
-            z3d_obj.run = -666
-            z3d_obj.zen_num = z3d_obj.header.data_logger
             try:
-                z3d_obj.cal_fn = cal_dict[z3d_obj.coil_num]
-            except KeyError:
-                z3d_obj.cal_fn = 0
-            # make a dictionary of values to put into data frame
-            entry = dict(
-                [
-                    (key, getattr(z3d_obj, value))
-                    for key, value in self._keys_dict.items()
-                ]
-            )
-            entry["start"] = z3d_obj.zen_schedule.isoformat()
-            entry["operator"] = z3d_obj.metadata.gdp_operator
-            entry["quality"] = 0
-            z3d_info_list.append(entry)
+                z3d_obj.read_all_info()
+                # z3d_obj.start = z3d_obj.zen_schedule.isoformat()
+                # set some attributes to null to fill later
+                z3d_obj.n_samples = 0
+                z3d_obj.block = 0
+                z3d_obj.run = -666
+                z3d_obj.zen_num = z3d_obj.header.data_logger
+                try:
+                    z3d_obj.cal_fn = cal_dict[z3d_obj.coil_num]
+                except KeyError:
+                    z3d_obj.cal_fn = 0
+                # make a dictionary of values to put into data frame
+                entry = dict(
+                    [
+                        (key, getattr(z3d_obj, value))
+                        for key, value in self._keys_dict.items()
+                    ]
+                )
+                try:
+                    entry["coil_number"] = int(entry["coil_number"])
+                except (ValueError, TypeError):
+                    entry["coil_number"] = 0
+                entry["start"] = z3d_obj.zen_schedule.isoformat()
+                entry["operator"] = z3d_obj.metadata.gdp_operator
+                entry["quality"] = 0
+                z3d_info_list.append(entry)
+            except MTTimeError:
+                print(f"WARNING: Skipping {z3d_fn}")
 
         # make pandas dataframe and set data types
         z3d_df = pd.DataFrame(z3d_info_list)
@@ -465,7 +473,7 @@ class Z3DCollection(object):
                     print(f"WARNING: No {ec} information for {station}")
                 entry[f"{ec}_length"] = e_df.dipole_length.median()
                 entry[f"{ec}_azimuth"] = e_df.azimuth.median()
-                entry[f"{ec}_ch_num"] = e_df.channel_number.median()
+                entry[f"{ec}_ch_num"] = np.nan_to_num(e_df.channel_number.median())
                 entry[f"{ec}_cres_start"] = 0
                 entry[f"{ec}_cres_end"] = 0
                 entry[f"{ec}_id"] = 0
@@ -481,7 +489,7 @@ class Z3DCollection(object):
                     continue
                 entry[f"{hc}_sensor"] = h_df.coil_number.median()
                 entry[f"{hc}_azimuth"] = h_df.azimuth.median()
-                entry[f"{hc}_ch_num"] = h_df.channel_number.median()
+                entry[f"{hc}_ch_num"] = np.nan_to_num(h_df.channel_number.median())
                 entry[f"{hc}_cal_fn"] = h_df.cal_fn.mode()[0]
 
             entry["sample_rates"] = ",".join(
@@ -502,6 +510,7 @@ class Z3DCollection(object):
         # make pandas dataframe and set data types
         summary_df = pd.DataFrame(entry_list)
         summary_df = summary_df.astype(self._summary_dtypes)
+                
         summary_df.start = pd.to_datetime(summary_df.start, errors="coerce")
         summary_df.end = pd.to_datetime(summary_df.end, errors="coerce")
 
