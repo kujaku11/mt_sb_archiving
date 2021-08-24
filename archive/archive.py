@@ -405,7 +405,7 @@ class SBMTArcive:
 
         return xml_fn
 
-    def make_station_mth5(self, station_dir, **kwargs):
+    def make_station_mth5(self, station_dir, example=False, **kwargs):
         """
         make an mth5 for a single station
 
@@ -468,6 +468,7 @@ class SBMTArcive:
                 logger_file_handler=self.logger.handlers[-1],
                 config_dict=self.mth5_cfg_dict,
                 survey_csv_fn=self.survey_csv_fn,
+                example=example,
             )
             run_df.loc[:, ("end")] = pd.Timestamp(
                 runts_obj.run_metadata.time_period.end
@@ -552,6 +553,7 @@ class SBMTArcive:
         username=None,
         password=None,
         file_types=[".zip", ".edi", ".png", ".xml", ".h5"],
+        example=False,
         **kwargs,
     ):
 
@@ -573,7 +575,7 @@ class SBMTArcive:
         for station_dir in station_dir_list:
             try:
                 station_df, station_mth5_fn = self.make_station_mth5(
-                    station_dir, **kwargs
+                    station_dir, example=example, **kwargs
                 )
                 archive_station_dir = station_mth5_fn.parent
                 archive_dirs.append(archive_station_dir)

@@ -91,4 +91,5 @@ sbmt.archive_stations(
     page_id=None,
     username=None,
     password=None,
+    example=True,
 )

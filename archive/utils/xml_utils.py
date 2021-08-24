@@ -514,15 +514,34 @@ class XMLRecord(object):
         df = validate_xml(
             self._contents.to_xml(), xsl_fname=schema, as_dataframe=as_dataframe
         )
+        if df not in [None, []]:
+            lines = ["Error Messages", "=" * 25]
+            for entry in df.itertuples():
+                lines += [f"\tLine: {entry.line}"]
+                lines += [f"\txpath: {entry.xpath}"]
+                lines += [f"\t{entry.message}"]
+                lines += ["-" * 25]
+    
+            print("\n".join(lines))
+        else:
+            print("░░░░░░░░░░░░░░░░░░░░░░█████████")
+            print("░░███████░░░░░░░░░░███▒▒▒▒▒▒▒▒███")
+            print("░░█▒▒▒▒▒▒█░░░░░░░███▒▒▒▒▒▒▒▒▒▒▒▒▒███")
+            print("░░░█▒▒▒▒▒▒█░░░░██▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒██")
+            print("░░░░█▒▒▒▒▒█░░░██▒▒▒▒▒██▒▒▒▒▒▒██▒▒▒▒▒███")
+            print("░░░░░█▒▒▒█░░░█▒▒▒▒▒▒████▒▒▒▒████▒▒▒▒▒▒██")
+            print("░░░█████████████▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒██")
+            print("░░░█▒▒▒▒▒▒▒▒▒▒▒▒█▒▒▒▒▒▒▒▒▒█▒▒▒▒▒▒▒▒▒▒▒██")
+            print("░██▒▒▒▒▒▒▒▒▒▒▒▒▒█▒▒▒██▒▒▒▒▒▒▒▒▒▒██▒▒▒▒██")
+            print("██▒▒▒███████████▒▒▒▒▒██▒▒▒▒▒▒▒▒██▒▒▒▒▒██")
+            print("█▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒█▒▒▒▒▒▒████████▒▒▒▒▒▒▒██")
+            print("██▒▒▒▒▒▒▒▒▒▒▒▒▒▒█▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒██")
+            print("░█▒▒▒███████████▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒██")
+            print("░██▒▒▒▒▒▒▒▒▒▒████▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒█")
+            print("░░████████████░░░█████████████████")
 
-        lines = ["Error Messages", "=" * 25]
-        for entry in df.itertuples():
-            lines += [f"\tLine: {entry.line}"]
-            lines += [f"\txpath: {entry.xpath}"]
-            lines += [f"\t{entry.message}"]
-            lines += ["-" * 25]
-
-        print("\n".join(lines))
+            print("BAM! You have a valid Science Base XML file.")
+            
 
 
 class XMLNode(object):

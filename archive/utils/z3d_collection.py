@@ -346,7 +346,8 @@ class Z3DCollection(object):
         return z3d_df
 
     def make_runts(
-        self, run_df, logger_file_handler=None, config_dict={}, survey_csv_fn=None
+        self, run_df, logger_file_handler=None, config_dict={}, survey_csv_fn=None,
+        example=False,
     ):
         """
         Create a RunTS object given a Dataframe of channels
@@ -361,7 +362,8 @@ class Z3DCollection(object):
         filter_object_list = []
         for entry in run_df.itertuples():
             ch_obj = zen.read_z3d(entry.fn_z3d, logger_file_handler=logger_file_handler)
-
+            if example:
+                ch_obj.ts = ch_obj.ts[0:256]
             if survey_csv_fn:
                 cfg_dict = self.get_station_from_csv(survey_csv_fn, entry.station)
                 config_dict[ch_obj.component].update(cfg_dict[ch_obj.component])
