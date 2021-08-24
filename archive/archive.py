@@ -163,6 +163,8 @@ class SBMTArcive:
         # self.logger.addHandler(stream_handler)
 
     def setup_file_logger(self, station, save_dir):
+        if self.logger.hasHandlers():
+            self.logger.handlers.clear()
         logging_fn = save_dir.joinpath("sb_archiving.log")
         file_handler = logging.FileHandler(filename=logging_fn, mode="w")
         file_handler.setFormatter(LOG_FORMAT)
@@ -429,11 +431,12 @@ class SBMTArcive:
         for k, v in kwargs.items():
             setattr(self, k, v)
 
+        station_dir = Path(station_dir)
+        
         # get the file names for each block of z3d files if none skip
         zc = z3d_collection.Z3DCollection(station_dir)
         try:
             fn_df = zc.get_z3d_df(calibration_path=self.calibration_dir)
-            station_dir = Path(station_dir)
             station, save_station_dir = self.setup_station_archive_dir(station_dir)
         except ValueError as error:
             msg = "folder %s because no Z3D files, %s"
@@ -455,6 +458,7 @@ class SBMTArcive:
         )
         mth5_fn = save_station_dir.joinpath(f"{station}.h5")
         m.open_mth5(mth5_fn, "w")
+        print(m.dataset_options)
         if not m.h5_is_write:
             msg = "Something went wrong with opening %, check logs"
             self.logger.error(msg, mth5_fn)
@@ -535,7 +539,12 @@ class SBMTArcive:
 
         try:
             sb_tools.sb_upload_data(
-                page_id, station_dir, username, password, f_types=file_types
+                page_id, 
+                station_dir,
+                username, 
+                password, 
+                f_types=file_types,
+                child_xml=True,
             )
         except Exception as error:
             msg = "Upload failed %s"
@@ -599,6 +608,11 @@ class SBMTArcive:
                 self.logger.warning("Skipping %s, %s", station_dir.name, error)
 
         if summarize:
+            # write csv
+            self.survey_df.to_csv(
+                self.archive_dir.joinpath("survey_summary.csv"), index=False
+            )
+            
             ### write shape file
             shp_df, shp_fn = survey_zc.write_shp_file(self.survey_df)
 
@@ -619,6 +633,8 @@ class SBMTArcive:
             )
 
             # dates
+            self.survey_df.start = pd.to_datetime(self.survey_df.start)
+            self.survey_df.end = pd.to_datetime(self.survey_df.end)
             survey_xml.update_time_period(
                 self.survey_df.start.min().isoformat(),
                 self.survey_df.end.max().isoformat(),
@@ -640,3 +656,44 @@ class SBMTArcive:
 
             for archive_station_dir in archive_dirs:
                 self.upload_data(page_id, archive_station_dir, username, file_types)
+
+
+    def upload_stations(self, page_id, archive_dir, username, password, 
+                        file_types=[".zip", ".edi", ".png", ".xml", ".h5"]):
+        """
+        Upload stations to Science Base
+        
+        :param page_id: DESCRIPTION
+        :type page_id: TYPE
+        :param archive_dir: DESCRIPTION
+        :type archive_dir: TYPE
+        :param username: DESCRIPTION
+        :type username: TYPE
+        :param password: DESCRIPTION
+        :type password: TYPE
+        :param file_types: DESCRIPTION, defaults to [".zip", ".edi", ".png", ".xml", ".h5"]
+        :type file_types: TYPE, optional
+        :return: DESCRIPTION
+        :rtype: TYPE
+
+        """
+
+        if isinstance(archive_dir, list):
+            archive_dirs = archive_dir
+        elif isinstance(archive_dir, (Path, str)):
+            archive_dirs = [p for p in Path(archive_dir).iterdir() if p.is_dir()]
+            
+        for archive_station_dir in archive_dirs:
+            print(f"Archiving: {archive_station_dir}")
+            try:
+                self.upload_data(page_id, 
+                                 archive_station_dir,
+                                 username,
+                                 password,
+                                 file_types)
+                print("\a")
+                print(f"Uploaded {archive_station_dir.name}")
+            except ArchiveError as error:
+                print("Could not archive %s" % error)
+                self.logger.warning("Could not archive %s", error)
+                
