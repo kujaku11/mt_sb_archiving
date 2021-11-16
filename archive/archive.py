@@ -32,6 +32,9 @@ from archive.utils import z3d_collection
 from archive import mt_xml
 from archive.utils import sb_tools
 
+import urllib as url
+import xml.etree.ElementTree as ET
+
 LOG_FORMAT = logging.Formatter(
     "%(asctime)s [line %(lineno)d] %(name)s.%(funcName)s - %(levelname)s: %(message)s"
 )
@@ -91,7 +94,6 @@ class SBMTArcive:
         self.mth5_chunks = None
         self.mth5_shuffle = None
         self.mth5_fletcher = None
-        self.mth5_file_version = "0.1.0"
 
         # conifiguration files
         self.survey_csv_fn = None
@@ -345,7 +347,7 @@ class SBMTArcive:
 
         return station, save_station_dir
 
-    def make_child_xml(self, station, save_station_dir, df, **kwargs):
+    def make_child_xml(self, station, save_station_dir, df=None, **kwargs):
         """
         Make a child XML file for a single station
 
@@ -363,11 +365,10 @@ class SBMTArcive:
         None.
 
         """
-        
-        station_df = df[df.station == station]
-        
         for k, v in kwargs.items():
             setattr(self, k, v)
+            
+        run_df = df[df.station==station]
 
         s_xml = mt_xml.MTSBXML()
         if self.xml_child_template:
@@ -375,19 +376,21 @@ class SBMTArcive:
         if self.xml_cfg_fn:
             s_xml.update_from_config(self.xml_cfg_fn, child=True)
 
+        station = run_df.station.unique()[0]
+
         s_xml.update_with_station(station)
 
         # location
         s_xml.update_bounding_box(
-            station_df.longitude.max(),
-            station_df.longitude.min(),
-            station_df.latitude.max(),
-            station_df.latitude.min(),
+            run_df.longitude.max(),
+            run_df.longitude.min(),
+            run_df.latitude.max(),
+            run_df.latitude.min(),
         )
 
         # start and end time
         s_xml.update_time_period(
-            station_df.start.min().isoformat(), station_df.end.max().isoformat()
+            run_df.start.min().isoformat(), run_df.end.max().isoformat()
         )
 
         s_xml.update_metadate()
@@ -398,7 +401,7 @@ class SBMTArcive:
 
         return xml_fn
 
-    def make_station_mth5(self, station_dir, example=False, **kwargs):
+    def make_station_mth5(self, station_dir, mth5_file_version="0.1.0", **kwargs):
         """
         make an mth5 for a single station
 
@@ -447,7 +450,6 @@ class SBMTArcive:
             fletcher32=self.mth5_fletcher,
             compression=self.mth5_compression,
             compression_opts=self.mth5_compression_level,
-            file_version=self.mth5_file_version,
         )
         mth5_fn = save_station_dir.joinpath(f"{station}.h5")
         m.open_mth5(mth5_fn, "w")
@@ -464,7 +466,6 @@ class SBMTArcive:
                 logger_file_handler=self.logger.handlers[-1],
                 config_dict=self.mth5_cfg_dict,
                 survey_csv_fn=self.survey_csv_fn,
-                example=example,
             )
             run_df.loc[:, ("end")] = pd.Timestamp(
                 runts_obj.run_metadata.time_period.end
@@ -554,7 +555,7 @@ class SBMTArcive:
         username=None,
         password=None,
         file_types=[".zip", ".edi", ".png", ".xml", ".h5"],
-        example=False,
+        mth5_file_version="0.1.0",
         **kwargs,
     ):
 
@@ -576,7 +577,7 @@ class SBMTArcive:
         for station_dir in station_dir_list:
             try:
                 station_df, station_mth5_fn = self.make_station_mth5(
-                    station_dir, example=example, **kwargs
+                    station_dir, mth5_file_version=mth5_file_version, **kwargs
                 )
                 archive_station_dir = station_mth5_fn.parent
                 archive_dirs.append(archive_station_dir)
@@ -587,9 +588,9 @@ class SBMTArcive:
                     ] = pd.Timestamp(station_df.end.max())
                 if make_xml:
                     _ = self.make_child_xml(
-                        station,
-                        archive_station_dir,
                         station_df,
+                        save_station_dir=archive_station_dir,
+                        survey_df=self.survey_df,
                         **kwargs,
                     )
                 if copy_files:
