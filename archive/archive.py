@@ -32,9 +32,6 @@ from archive.utils import z3d_collection
 from archive import mt_xml
 from archive.utils import sb_tools
 
-import urllib as url
-import xml.etree.ElementTree as ET
-
 LOG_FORMAT = logging.Formatter(
     "%(asctime)s [line %(lineno)d] %(name)s.%(funcName)s - %(levelname)s: %(message)s"
 )
