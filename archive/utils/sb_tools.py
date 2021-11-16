@@ -288,3 +288,36 @@ def get_nm_elev(lat, lon):
         )
         print(error)
         return -666
+    
+def download_files(page_id, save_dir, file_types=[".edi"]):
+    """
+    
+    :param page_id: DESCRIPTION
+    :type page_id: TYPE
+    :param destination: DESCRIPTION
+    :type destination: TYPE
+    :param file_types: DESCRIPTION, defaults to [".edi"]
+    :type file_types: TYPE, optional
+    :return: DESCRIPTION
+    :rtype: TYPE
+
+    """
+    
+    session = sb.SbSession()
+
+    children = session.get_child_ids(page_id)
+
+    for child_id in children:
+        child = session.get_item(child_id)
+        file_names = [{"name": c["name"], "url": c["url"]} for c in child["files"]]
+        for ftype in file_types:
+            try:
+                fn_dict = [fn for fn in file_names if fn["name"].endswith(ftype)][0]
+            except IndexError:
+                print(f"Could not find {ftype} file in {child['title']} ")
+                continue
+        
+            session.download_file(fn_dict["url"], 
+                                  fn_dict["name"], 
+                                  destination=save_dir)
+            print(f"--> downloaded {fn_dict['name']}")
