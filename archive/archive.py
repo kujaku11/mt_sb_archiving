@@ -105,15 +105,13 @@ class SBMTArcive:
         self.png_dir = None
         self.xml_dir = None
         self.mth5_cfg_dict = {}
+        self.xml_cfg_dict = {}
 
         self.logger = logging.getLogger(self.__class__.__name__)
         self.setup_logger()
 
         for k, v in kwargs.items():
             setattr(self, k, v)
-
-        if self.mth5_cfg_fn:
-            self.mth5_cfg_dict = self.read_cfg_file(self.mth5_cfg_fn)
 
     def __str__(self):
         """overwrite the string representation"""
@@ -146,6 +144,18 @@ class SBMTArcive:
         if "_dir" in name or "_fn" in name or "_template" in name:
             if value is not None:
                 value = Path(value)
+            
+                if name == "survey_csv_fn":
+                    self.survey_df = self.read_csv(value)
+                    self.survey_df.start = pd.to_datetime(self.survey_df.start)
+                    self.survey_df.end = pd.to_datetime(self.survey_df.end)
+                
+                elif name == "mth5_cfg_fn":
+                    self.mth5_cfg_dict = self.read_cfg_file(value)
+                    
+                elif name == "xml_cfg_fn":
+                    self.xml_cfg_dict = self.read_cfg_file(value)
+                
         super().__setattr__(name, value)
 
     def setup_logger(self):
@@ -190,6 +200,19 @@ class SBMTArcive:
         cfg_obj = ConfigParser()
         cfg_obj.read_file(fn.open())
         return cfg_obj._sections
+    
+    def read_csv(self, fn):
+        """
+        Read a CSV into a pandas DataFrame
+        
+        :param fn: DESCRIPTION
+        :type fn: TYPE
+        :return: DESCRIPTION
+        :rtype: TYPE
+
+        """
+        
+        return pd.read_csv(fn)
 
     def get_station_directories(self, survey_dir=None):
         """
@@ -585,9 +608,9 @@ class SBMTArcive:
                     ] = pd.Timestamp(station_df.end.max())
                 if make_xml:
                     _ = self.make_child_xml(
+                        station,
+                        archive_station_dir,
                         station_df,
-                        save_station_dir=archive_station_dir,
-                        survey_df=self.survey_df,
                         **kwargs,
                     )
                 if copy_files:
