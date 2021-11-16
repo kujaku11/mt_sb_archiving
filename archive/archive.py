@@ -407,7 +407,7 @@ class SBMTArcive:
 
         return xml_fn
 
-    def make_station_mth5(self, station_dir, **kwargs):
+    def make_station_mth5(self, station_dir, mth5_file_version="0.1.0", **kwargs):
         """
         make an mth5 for a single station
 
@@ -451,6 +451,7 @@ class SBMTArcive:
 
         # Make MTH5 File
         m = MTH5(
+            file_version=mth5_file_version,
             shuffle=self.mth5_shuffle,
             fletcher32=self.mth5_fletcher,
             compression=self.mth5_compression,
@@ -458,7 +459,6 @@ class SBMTArcive:
         )
         mth5_fn = save_station_dir.joinpath(f"{station}.h5")
         m.open_mth5(mth5_fn, "w")
-        print(m.dataset_options)
         if not m.h5_is_write:
             msg = "Something went wrong with opening %, check logs"
             self.logger.error(msg, mth5_fn)
@@ -561,6 +561,7 @@ class SBMTArcive:
         username=None,
         password=None,
         file_types=[".zip", ".edi", ".png", ".xml", ".h5"],
+        mth5_file_version="0.1.0",
         **kwargs,
     ):
 
@@ -582,7 +583,7 @@ class SBMTArcive:
         for station_dir in station_dir_list:
             try:
                 station_df, station_mth5_fn = self.make_station_mth5(
-                    station_dir, **kwargs
+                    station_dir, mth5_file_version=mth5_file_version, **kwargs
                 )
                 archive_station_dir = station_mth5_fn.parent
                 archive_dirs.append(archive_station_dir)

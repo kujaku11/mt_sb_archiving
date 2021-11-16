@@ -61,7 +61,10 @@ class MTSBXML(xml_utils.XMLRecord):
         c = self.read_config(cfg_fn)
 
         self._run_update(self._update_cite_info, c["general"])
-        self._run_update(self._update_journal_citation, c["journal_citation"])
+        try:
+            self._run_update(self._update_journal_citation, c["journal_citation"])
+        except KeyError:
+            print("WARNING: No journal information skipping")
         self._run_update(self._update_description, c["general"])
         for k in ["general", "thesaurus"]:
             self._run_update(self._update_keywords, c["keywords"][k], k)

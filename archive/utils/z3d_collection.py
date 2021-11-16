@@ -586,7 +586,7 @@ class Z3DCollection(object):
         )
 
         for col in ["start_date", "end_date"]:
-            survey_df[col] = survey_df.astype(str)
+            survey_df[col] = survey_df[col].astype(str)
 
         # list of columns to take from the database
         col_list = [
