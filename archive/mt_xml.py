@@ -249,6 +249,8 @@ class MTSBXML(xml_utils.XMLRecord):
             count = len(self.metadata.idinfo.keywords.place[index].placekey)
         except TypeError:
             count = 1
+        except IndexError:
+            return
         self.metadata.idinfo.keywords.place[index].clear_children("placekey")
         for k in kw:
             xml_utils.XMLNode(
@@ -267,10 +269,13 @@ class MTSBXML(xml_utils.XMLRecord):
 
         index = index_dict[temporal]
         kw = [k.strip() for k in temporal_string.split(",")]
+        if kw == None:
+            return
         try:
             count = len(self.metadata.idinfo.keywords.temporal[index].tempkey)
         except TypeError:
             count = 1
+
         self.metadata.idinfo.keywords.temporal[index].clear_children("tempkey")
         for k in kw:
             xml_utils.XMLNode(
