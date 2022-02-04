@@ -241,17 +241,29 @@ class MTSBXML(xml_utils.XMLRecord):
         """
         update places
         """
-        index_dict = {"gnis": 0, "common": 1, "terranes": 2}
 
-        index = index_dict[place]
+        if isinstance(self.metadata.idinfo.keywords.place, list):
+            index_dict = dict([(k.placekt.text.lower(), ii) for ii, k in 
+                              enumerate(self.metadata.idinfo.keywords.place)])
+            if place == "gnis":
+                place = 'geographic names information system (gnis)'
+            elif place == "common":
+                place = 'common geographic areas'
+            elif place == "terranes":
+                place = "none"
+            index = index_dict[place]
+            
         kw = [k.strip() for k in place_string.split(",")]
+        if len(kw) == 1:
+            if kw[0] in ["none", "None", "null"]:
+                self.metadata.idinfo.keywords.place.pop(index)
+                return
         try:
             count = len(self.metadata.idinfo.keywords.place[index].placekey)
-        except TypeError:
+            self.metadata.idinfo.keywords.place[index].clear_children("placekey")
+        except (TypeError, IndexError):
             count = 1
-        except IndexError:
-            return
-        self.metadata.idinfo.keywords.place[index].clear_children("placekey")
+        
         for k in kw:
             xml_utils.XMLNode(
                 tag="placekey",
@@ -265,18 +277,24 @@ class MTSBXML(xml_utils.XMLRecord):
         """
         update places
         """
-        index_dict = {"geolex": 0, "eras": 1}
+        if isinstance(self.metadata.idinfo.keywords.temporal, list):
+            index_dict = dict([(k.tempkt.text.lower(), ii) for ii, k in 
+                              enumerate(self.metadata.idinfo.keywords.temporal)])
+            if temporal == "eras":
+                temporal = "none"
+            index = index_dict[temporal]
 
-        index = index_dict[temporal]
         kw = [k.strip() for k in temporal_string.split(",")]
-        if kw == None:
-            return
+        if len(kw) == 1:
+            if kw[0] in ["none", "None", "null"]:
+                self.metadata.idinfo.keywords.temporal.pop(index)
+                return
         try:
             count = len(self.metadata.idinfo.keywords.temporal[index].tempkey)
-        except TypeError:
+            self.metadata.idinfo.keywords.temporal[index].clear_children("tempkey")
+        except (TypeError, IndexError):
             count = 1
 
-        self.metadata.idinfo.keywords.temporal[index].clear_children("tempkey")
         for k in kw:
             xml_utils.XMLNode(
                 tag="tempkey",
