@@ -470,10 +470,12 @@ class XMLRecord(object):
             if self._fn.exists():
                 self.read(self._fn)
 
-    def read(self, fn):
+    def read(self, fn=None):
         """
         Read xml file
         """
+        if fn is not None:
+            self._fn = fn
         self.record = lxml.parse(self.fn.as_posix())
         self._root = self.record.getroot()
         self.tag = self._root.tag
