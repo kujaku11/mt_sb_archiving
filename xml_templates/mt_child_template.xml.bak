@@ -93,6 +93,7 @@
       <temporal>
         <tempkt>Geolex</tempkt>
         <tempkey>ages in the geolexicon data base https://ngmdb.usgs.gov/Geolex/search</tempkey>
+        <tempkey></tempkey>
       </temporal>
       <temporal>
         <tempkt>None</tempkt>
