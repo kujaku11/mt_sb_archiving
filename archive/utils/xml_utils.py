@@ -516,7 +516,8 @@ class XMLRecord(object):
         df = validate_xml(
             self._contents.to_xml(), xsl_fname=schema, as_dataframe=as_dataframe
         )
-        if df not in [None, []]:
+        print(df)
+        if isinstance(df, pd.DataFrame):
             lines = ["Error Messages", "=" * 25]
             for entry in df.itertuples():
                 lines += [f"\tLine: {entry.line}"]

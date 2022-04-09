@@ -370,6 +370,10 @@ class Z3DCollection(object):
         filter_object_list = []
         for entry in run_df.itertuples():
             ch_obj = zen.read_z3d(entry.fn_z3d, logger_file_handler=logger_file_handler)
+            
+            if isinstance(ch_obj, type(None)):
+                continue
+                
             if example:
                 ch_obj.ts = ch_obj.ts[0:256]
             if survey_csv_fn:
