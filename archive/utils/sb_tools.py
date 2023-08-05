@@ -40,7 +40,9 @@ def sb_locate_child_item(sb_session, station, sb_page_id):
         ### for some reason there is a child item that doesn't play nice
         ### so have to skip it
         try:
-            item_title = sb_session.get_item(item_id, {"fields": "title"})["title"]
+            item_title = sb_session.get_item(item_id, {"fields": "title"})[
+                "title"
+            ]
         except:
             continue
         if station in item_title:
@@ -115,7 +117,9 @@ def sb_session_login(sb_session, sb_username, sb_password=None):
     return sb_session
 
 
-def sb_get_fn_list(archive_dir, f_types=[".zip", ".edi", ".png", ".xml", ".h5"]):
+def sb_get_fn_list(
+    archive_dir, f_types=[".zip", ".edi", ".png", ".xml", ".h5"]
+):
     """
     Get the list of files to archive looking for .zip, .edi, .png within the
     archive directory.  Sorts in the order of xml, edi, png, zip
@@ -213,7 +217,7 @@ def sb_upload_data(
             print(f"updated XML {c_xml_fn} to {c_xml.fn}")
         except IndexError:
             print(f"No Child XML found for {station}")
-            
+
     # sort list so that xml, edi, png, zip files
     # upload data
     try:
@@ -264,7 +268,6 @@ def get_nm_elev(lat, lon):
 
     """
     nm_url = r"https://nationalmap.gov/epqs/pqs.php?x={0:.5f}&y={1:.5f}&units=Meters&output=xml"
-    print(lat, lon)
     # call the url and get the response
     try:
         response = url.request.urlopen(nm_url.format(lon, lat))
@@ -288,10 +291,11 @@ def get_nm_elev(lat, lon):
         )
         print(error)
         return -666
-    
+
+
 def download_files(page_id, save_dir, file_types=[".edi"]):
     """
-    
+
     :param page_id: DESCRIPTION
     :type page_id: TYPE
     :param destination: DESCRIPTION
@@ -302,22 +306,26 @@ def download_files(page_id, save_dir, file_types=[".edi"]):
     :rtype: TYPE
 
     """
-    
+
     session = sb.SbSession()
 
     children = session.get_child_ids(page_id)
 
     for child_id in children:
         child = session.get_item(child_id)
-        file_names = [{"name": c["name"], "url": c["url"]} for c in child["files"]]
+        file_names = [
+            {"name": c["name"], "url": c["url"]} for c in child["files"]
+        ]
         for ftype in file_types:
             try:
-                fn_dict = [fn for fn in file_names if fn["name"].endswith(ftype)][0]
+                fn_dict = [
+                    fn for fn in file_names if fn["name"].endswith(ftype)
+                ][0]
             except IndexError:
                 print(f"Could not find {ftype} file in {child['title']} ")
                 continue
-        
-            session.download_file(fn_dict["url"], 
-                                  fn_dict["name"], 
-                                  destination=save_dir)
+
+            session.download_file(
+                fn_dict["url"], fn_dict["name"], destination=save_dir
+            )
             print(f"--> downloaded {fn_dict['name']}")
