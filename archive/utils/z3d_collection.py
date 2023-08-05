@@ -30,7 +30,6 @@ from mth5.io import zen
 from mth5.timeseries import RunTS
 
 from mt_metadata.timeseries.filters import FrequencyResponseTableFilter
-from mt_metadata.utils.mttime import MTTimeError
 
 # =============================================================================
 class Z3DCollectionError(Exception):
@@ -244,7 +243,6 @@ class Z3DCollection(object):
             raise ValueError(
                 "Error: Directory {0} does not exist".format(self.z3d_path)
             )
-
         z3d_list = [
             fn_path
             for fn_path in self.z3d_path.rglob("*")
@@ -259,22 +257,18 @@ class Z3DCollection(object):
         if calibration_path is None:
             print("WARNING: Calibration path is None")
             return {}
-
         if not isinstance(calibration_path, Path):
             calibration_path = Path(calibration_path)
-
         if not calibration_path.exists():
             print(
                 "WARNING: could not find calibration path: "
                 "{0}".format(calibration_path)
             )
             return {}
-
         calibration_dict = {}
         for cal_fn in calibration_path.glob("*.csv"):
             cal_num = cal_fn.stem
             calibration_dict[cal_num] = cal_fn
-
         return calibration_dict
 
     def get_z3d_df(self, z3d_path=None, calibration_path=None):
@@ -300,7 +294,6 @@ class Z3DCollection(object):
 
         if len(z3d_fn_list) < 1:
             raise ValueError("No Z3D files found")
-
         cal_dict = self.get_calibrations(calibration_path)
         z3d_info_list = []
         for z3d_fn in z3d_fn_list:
@@ -332,9 +325,8 @@ class Z3DCollection(object):
                 entry["operator"] = z3d_obj.metadata.gdp_operator
                 entry["quality"] = 0
                 z3d_info_list.append(entry)
-            except MTTimeError:
+            except ValueError:
                 print(f"WARNING: Skipping {z3d_fn}")
-
         # make pandas dataframe and set data types
         z3d_df = pd.DataFrame(z3d_info_list)
         z3d_df = z3d_df.astype(self._dtypes)
@@ -346,15 +338,17 @@ class Z3DCollection(object):
             starts = sorted(z3d_df[z3d_df.sample_rate == sr].start.unique())
             for block_num, start in enumerate(starts):
                 z3d_df.loc[(z3d_df.start == start), "block"] = block_num
-
         # assign run number
         for ii, start in enumerate(sorted(z3d_df.start.unique())):
             z3d_df.loc[(z3d_df.start == start), "run"] = ii
-
         return z3d_df
 
     def make_runts(
-        self, run_df, logger_file_handler=None, config_dict={}, survey_csv_fn=None,
+        self,
+        run_df,
+        logger_file_handler=None,
+        config_dict={},
+        survey_csv_fn=None,
         example=False,
     ):
         """
@@ -370,10 +364,9 @@ class Z3DCollection(object):
         filter_object_list = []
         for entry in run_df.itertuples():
             ch_obj = zen.read_z3d(entry.fn_z3d, logger_file_handler=logger_file_handler)
-            
+
             if isinstance(ch_obj, type(None)):
                 continue
-                
             if example:
                 ch_obj.ts = ch_obj.ts[0:256]
             if survey_csv_fn:
@@ -381,38 +374,32 @@ class Z3DCollection(object):
                 config_dict[ch_obj.component].update(cfg_dict[ch_obj.component])
                 config_dict["run"].update(cfg_dict["run"])
                 config_dict["station"].update(cfg_dict["station"])
-
             try:
                 ch_dict = config_dict[ch_obj.component]
                 ch_obj.channel_metadata.from_dict(ch_dict, skip_none=True)
             except KeyError:
                 pass
-
             if entry.cal_fn not in [0, "0"]:
                 if not ch_obj.channel_response_filter:
                     fap_obj = self._make_fap_filter(entry.cal_fn)
                     filter_object_list.append(fap_obj)
                     ch_obj.channel_metadata.filter.name.append(fap_obj.name)
                     ch_obj.channel_metadata.filter.applied.append(False)
-
             ch_obj.run_metadata.id = f"{run_df.run.unique()[0]:03d}"
             ch_list.append(ch_obj)
 
             filter_object_list += ch_obj.channel_response_filter.filters_list
-
         run_obj = RunTS(array_list=ch_list)
         try:
             run_dict = config_dict["run"]
             run_obj.run_metadata.from_dict(run_dict, skip_none=True)
         except KeyError:
             pass
-
         try:
             station_dict = config_dict["station"]
             run_obj.station_metadata.from_dict(station_dict, skip_none=True)
         except KeyError:
             pass
-
         return run_obj, filter_object_list
 
     def _make_fap_filter(self, cal_fn):
@@ -423,7 +410,6 @@ class Z3DCollection(object):
         cal_fn = Path(cal_fn)
         if not cal_fn.exists():
             raise IOError(f"Could not find {cal_fn}")
-
         fap_df = pd.read_csv(cal_fn)
         fap = FrequencyResponseTableFilter()
         fap.units_in = "millivolts"
@@ -472,7 +458,6 @@ class Z3DCollection(object):
                 entry[f"n_runs_{sr}"] = len(
                     station_df.loc[station_df.sample_rate == sr].block.unique()
                 )
-
             for ec in ["ex", "ey"]:
                 e_df = station_df.loc[station_df.component == ec]
                 if len(e_df) == 0:
@@ -483,7 +468,6 @@ class Z3DCollection(object):
                 entry[f"{ec}_cres_start"] = 0
                 entry[f"{ec}_cres_end"] = 0
                 entry[f"{ec}_id"] = 0
-
             for hc in ["hx", "hy", "hz"]:
                 h_df = station_df.loc[station_df.component == hc]
                 if len(h_df) == 0:
@@ -497,7 +481,6 @@ class Z3DCollection(object):
                 entry[f"{hc}_azimuth"] = h_df.azimuth.median()
                 entry[f"{hc}_ch_num"] = np.nan_to_num(h_df.channel_number.median())
                 entry[f"{hc}_cal_fn"] = h_df.cal_fn.mode()[0]
-
             entry["sample_rates"] = ",".join(
                 [f"{ff}" for ff in station_df.sample_rate.unique()]
             )
@@ -512,17 +495,15 @@ class Z3DCollection(object):
             entry["type"] = "WBMT"
 
             entry_list.append(entry)
-
         # make pandas dataframe and set data types
         summary_df = pd.DataFrame(entry_list)
         summary_df = summary_df.astype(self._summary_dtypes)
-                
+
         summary_df.start = pd.to_datetime(summary_df.start, errors="coerce")
         summary_df.end = pd.to_datetime(summary_df.end, errors="coerce")
 
         if output_fn:
             summary_df.to_csv(output_fn, index=False)
-
         return summary_df
 
     def get_station_from_csv(self, csv_fn, station):
@@ -531,7 +512,6 @@ class Z3DCollection(object):
         sdf = df.loc[df.station == station]
         if len(sdf) == 0:
             print(f"Could not find {station} in {csv_fn}")
-
         cfg_dict = dict(
             [(k, {}) for k in ["station", "run", "ex", "ey", "hx", "hy", "hz"]]
         )
@@ -547,7 +527,6 @@ class Z3DCollection(object):
                 dkey = metadata_key.split(".", 1)[0]
                 dvalue = metadata_key.split(".", 1)[1]
                 cfg_dict[dkey][dvalue] = entry_value
-
         return cfg_dict
 
     def write_shp_file(self, survey_df, save_path=None):
@@ -574,7 +553,6 @@ class Z3DCollection(object):
             save_fn = save_path
         else:
             save_fn = self.z3d_path.joinpath("survey_sites.shp")
-
         geometry = [
             Point(x, y) for x, y in zip(survey_df.longitude, survey_df.latitude)
         ]
@@ -593,7 +571,6 @@ class Z3DCollection(object):
 
         for col in ["start_date", "end_date"]:
             survey_df[col] = survey_df[col].astype(str)
-
         # list of columns to take from the database
         col_list = [
             "siteID",
