@@ -243,7 +243,7 @@ def sb_upload_data(
 # =============================================================================
 # Get national map elevation data from internet
 # =============================================================================
-def get_nm_elev(lat, lon):
+def get_nm_elev(latitude, longitude):
     """
     Get national map elevation for a given lat and lon.
 
@@ -267,10 +267,15 @@ def get_nm_elev(lat, lon):
     .. note:: Needs an internet connection to work.
 
     """
+    nm_url = (
+        r"http://gisdata.usgs.gov/xmlwebservices2/elevation_service.asmx/getElevation?"
+        f"X_Value= {longitude}&Y_Value= {latitude}&Elevation_Units=METERS&"
+        "Source_Layer=-1&Elevation_Only=true."
+    )
     nm_url = r"https://nationalmap.gov/epqs/pqs.php?x={0:.5f}&y={1:.5f}&units=Meters&output=xml"
     # call the url and get the response
     try:
-        response = url.request.urlopen(nm_url.format(lon, lat))
+        response = url.request.urlopen(nm_url)
     except (url.error.HTTPError, url.request.http.client.RemoteDisconnected):
         print("xxx GET_ELEVATION_ERROR: Could not connect to internet")
         return -666
@@ -285,9 +290,8 @@ def get_nm_elev(lat, lon):
         return nm_elev
     except ET.ParseError as error:
         print(
-            "xxx Something wrong with xml elevation for lat = {0:.5f}, lon = {1:.5f}".format(
-                lat, lon
-            )
+            "xxx Something wrong with xml elevation for "
+            f"lat = {latitude:.5f}, lon = {longitude:.5f}"
         )
         print(error)
         return -666
