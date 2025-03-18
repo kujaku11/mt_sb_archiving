@@ -2,7 +2,7 @@
 """
 Created on Thu Jun 10 12:33:12 2021
 
-:copyright: 
+:copyright:
     Jared Peacock (jpeacock@usgs.gov)
 
 :license: MIT
@@ -243,16 +243,20 @@ class MTSBXML(xml_utils.XMLRecord):
         """
 
         if isinstance(self.metadata.idinfo.keywords.place, list):
-            index_dict = dict([(k.placekt.text.lower(), ii) for ii, k in 
-                              enumerate(self.metadata.idinfo.keywords.place)])
+            index_dict = dict(
+                [
+                    (k.placekt.text.lower(), ii)
+                    for ii, k in enumerate(self.metadata.idinfo.keywords.place)
+                ]
+            )
             if place == "gnis":
-                place = 'geographic names information system (gnis)'
+                place = "geographic names information system (gnis)"
             elif place == "common":
-                place = 'common geographic areas'
+                place = "common geographic areas"
             elif place == "terranes":
                 place = "none"
             index = index_dict[place]
-            
+
         kw = [k.strip() for k in place_string.split(",")]
         if len(kw) == 1:
             if kw[0] in ["none", "None", "null"]:
@@ -263,7 +267,7 @@ class MTSBXML(xml_utils.XMLRecord):
             self.metadata.idinfo.keywords.place[index].clear_children("placekey")
         except (TypeError, IndexError):
             count = 1
-        
+
         for k in kw:
             xml_utils.XMLNode(
                 tag="placekey",
@@ -278,8 +282,12 @@ class MTSBXML(xml_utils.XMLRecord):
         update places
         """
         if isinstance(self.metadata.idinfo.keywords.temporal, list):
-            index_dict = dict([(k.tempkt.text.lower(), ii) for ii, k in 
-                              enumerate(self.metadata.idinfo.keywords.temporal)])
+            index_dict = dict(
+                [
+                    (k.tempkt.text.lower(), ii)
+                    for ii, k in enumerate(self.metadata.idinfo.keywords.temporal)
+                ]
+            )
             if temporal == "eras":
                 temporal = "none"
             index = index_dict[temporal]
@@ -598,15 +606,15 @@ class MTSBXML(xml_utils.XMLRecord):
         )
 
         for ii in range(3):
-            self.metadata.eainfo.overview[
-                ii
-            ].eaover.text = self.metadata.eainfo.overview[ii].eaover.text.replace(
-                "{STATION}", station
+            self.metadata.eainfo.overview[ii].eaover.text = (
+                self.metadata.eainfo.overview[ii].eaover.text.replace(
+                    "{STATION}", station
+                )
             )
-            self.metadata.eainfo.overview[
-                ii
-            ].eadetcit.text = self.metadata.eainfo.overview[ii].eadetcit.text.replace(
-                "{STATION}", station
+            self.metadata.eainfo.overview[ii].eadetcit.text = (
+                self.metadata.eainfo.overview[ii].eadetcit.text.replace(
+                    "{STATION}", station
+                )
             )
 
     def update_metadate(self):
